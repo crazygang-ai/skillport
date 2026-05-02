@@ -2,15 +2,6 @@ import Foundation
 import Testing
 @testable import Skillport
 
-// Bundle.module is not generated for xcodegen Xcode test targets.
-// Use Bundle(for:) with a marker class instead.
-private enum TestBundleLocator {
-    static let bundle: Bundle = {
-        class InternalMarker {}
-        return Bundle(for: InternalMarker.self)
-    }()
-}
-
 @Suite("LockFile")
 struct LockFileTests {
     @Test("Decodes v3 sample with github and local sources")
