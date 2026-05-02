@@ -4,6 +4,7 @@ import SwiftUI
 struct SkillEditorView: View {
     let skillID: SkillIdentity?
 
+    @Environment(AppModel.self) private var app
     @Environment(SkillsModel.self) private var skillsModel
     @Environment(NotificationModel.self) private var notifications
     @State private var state = EditorState()
@@ -26,18 +27,29 @@ struct SkillEditorView: View {
         }
         .navigationTitle(state.filePath?.lastPathComponent ?? "Editor")
         .toolbar {
-            Button {
-                do {
-                    try state.save()
-                    notifications.post(.init(level: .success, message: "Saved."))
-                } catch {
-                    notifications.post(.init(level: .error, message: "Save failed: \(error)"))
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    app.setSection(.dashboard)
+                } label: {
+                    Label("Back", systemImage: "chevron.left")
                 }
-            } label: {
-                Label("Save", systemImage: "square.and.arrow.down")
+                .help("Back to Dashboard")
             }
-            .keyboardShortcut("s", modifiers: .command)
-            .disabled(!state.isDirty)
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    do {
+                        try state.save()
+                        notifications.post(.init(level: .success, message: "Saved."))
+                    } catch {
+                        notifications.post(
+                            .init(level: .error, message: "Save failed: \(error)"))
+                    }
+                } label: {
+                    Label("Save", systemImage: "square.and.arrow.down")
+                }
+                .keyboardShortcut("s", modifiers: .command)
+                .disabled(!state.isDirty)
+            }
         }
         .task(id: skillID) {
             if let skillID, let skill = skillsModel.skills.first(where: { $0.id == skillID }) {
