@@ -22,7 +22,7 @@ struct SkillportApp: App {
         .windowResizability(.contentSize)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("Import Skill…") { /* 接在 Task 48 */ }
+                Button("Import Skill…") {}  // 接在 Task 48
                     .keyboardShortcut("n", modifiers: .command)
             }
             CommandGroup(after: .appSettings) {
@@ -30,7 +30,7 @@ struct SkillportApp: App {
                     Task { try? await container.skillsModel.refresh() }
                 }
                 .keyboardShortcut("r", modifiers: .command)
-                Button("Check for Skill Updates") { /* 接在后续 milestone */ }
+                Button("Check for Skill Updates") {}  // 接在后续 milestone
                     .keyboardShortcut("u", modifiers: .command)
             }
         }
