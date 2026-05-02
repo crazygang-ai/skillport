@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+      - name: Bootstrap
+        run: ./Scripts/bootstrap.sh
+      - name: Generate project
+        run: ./Scripts/generate-project.sh
+      - name: Lint
+        run: swift-format lint --recursive App Domain Tests
+      - name: Build & Test
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -scheme Skillport \
+            -destination 'platform=macOS' \
+            -enableCodeCoverage YES \
+            test | xcpretty
+      - name: Surface test failures
+        if: failure()
+        run: |
+          find ~/Library/Developer/Xcode/DerivedData -name "*.xcresult" -print -exec echo {} \;
