@@ -22,8 +22,25 @@ struct SkillportApp: App {
         .windowResizability(.contentSize)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("Import Skill…") {}  // 接在 Task 48
-                    .keyboardShortcut("n", modifiers: .command)
+                Button("Import Skill…") {
+                    guard let url = ImportCommand.pickFolder() else { return }
+                    Task {
+                        do {
+                            _ = try await container.skillsModel.installLocal(
+                                from: url, installTo: [])
+                            container.notificationModel.post(
+                                .init(
+                                    level: .success,
+                                    message: "Imported \(url.lastPathComponent)"))
+                        } catch {
+                            container.notificationModel.post(
+                                .init(
+                                    level: .error,
+                                    message: "Import failed: \(error)"))
+                        }
+                    }
+                }
+                .keyboardShortcut("n", modifiers: .command)
             }
             CommandGroup(after: .appSettings) {
                 Button("Rescan") {
