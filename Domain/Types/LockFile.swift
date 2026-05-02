@@ -3,10 +3,11 @@ import Foundation
 // MARK: - Public types
 
 public struct LockFile: Equatable, Sendable {
+    public static let currentVersion: Int = 3
     public let version: Int
-    public let skills: [LockedSkill]
+    public var skills: [LockedSkill]
 
-    public init(version: Int, skills: [LockedSkill]) {
+    public init(version: Int = LockFile.currentVersion, skills: [LockedSkill]) {
         self.version = version
         self.skills = skills
     }
