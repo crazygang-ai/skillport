@@ -19,7 +19,7 @@ public enum DomainEvent: Sendable {
     case error(SkillportError)
 }
 
-public enum NotificationLevel: Sendable {
+public enum NotificationLevel: Sendable, Equatable {
     case info, warning, error, success
 }
 
