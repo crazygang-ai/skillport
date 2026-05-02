@@ -1,0 +1,19 @@
+{
+  "version": 3,
+  "skills": [
+    {
+      "name": "superpowers",
+      "source": { "type": "github", "owner": "obra", "repo": "superpowers", "ref": "main" },
+      "installedAt": "2026-05-01T10:00:00Z",
+      "commitHash": "abc123def456",
+      "path": "/Users/crazy/.agents/skills/superpowers"
+    },
+    {
+      "name": "my-local",
+      "source": { "type": "local", "path": "/Users/crazy/skills/my-local" },
+      "installedAt": "2026-04-28T09:00:00Z",
+      "commitHash": null,
+      "path": "/Users/crazy/.agents/skills/my-local"
+    }
+  ]
+}
