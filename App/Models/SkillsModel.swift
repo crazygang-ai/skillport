@@ -19,7 +19,7 @@ public final class SkillsModel {
         subscribe()
     }
 
-    nonisolated deinit {
+    deinit {
         subscription?.cancel()
     }
 
