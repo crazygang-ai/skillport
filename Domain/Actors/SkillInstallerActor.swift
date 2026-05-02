@@ -98,8 +98,9 @@ public actor SkillInstallerActor {
         )
     }
 
-    /// Remove from all agents + lockfile. Canonical files are preserved on disk.
-    /// Caller can manually delete `~/.agents/skills/<name>/` if they want.
+    /// Remove from all agents, delete canonical files, drop lockfile entry.
+    /// This is a complete removal; use `toggleAgent(install: false)` if you only
+    /// want to unlink from a specific agent while keeping the canonical copy.
     public func uninstall(name: String, home: URL) async throws {
         let canonical = home.appendingPathComponent(".agents/skills/\(name)")
         // 撤销所有 agent symlinks
@@ -109,7 +110,10 @@ public actor SkillInstallerActor {
                 try? await symlinker.unlink(at: link, expectedTarget: canonical)
             }
         }
-        // Remove from lockfile. canonical files intentionally kept on disk.
+        // Delete canonical files + drop lockfile entry.
+        if FileManager.default.fileExists(atPath: canonical.path) {
+            try FileManager.default.removeItem(at: canonical)
+        }
         try await lockFile.remove(name: name)
     }
 

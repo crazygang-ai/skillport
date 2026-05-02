@@ -36,7 +36,7 @@ struct SkillInstallerActorTests {
         #expect(resolved.hasSuffix(".agents/skills/localSkill"))
     }
 
-    @Test("uninstall removes symlink and lockfile entry, keeps canonical files")
+    @Test("uninstall removes symlink, lockfile entry, and canonical files")
     func uninstall() async throws {
         let dir = try TempDir.create()
         defer { try? dir.cleanup() }
@@ -58,8 +58,8 @@ struct SkillInstallerActorTests {
         try await installer.uninstall(name: "s", home: home)
         let link = home.appendingPathComponent(".kiro/skills/s")
         #expect(!FileManager.default.fileExists(atPath: link.path))
-        let canonical = home.appendingPathComponent(".agents/skills/s/SKILL.md")
-        #expect(FileManager.default.fileExists(atPath: canonical.path))  // 保留
+        let canonicalDir = home.appendingPathComponent(".agents/skills/s")
+        #expect(!FileManager.default.fileExists(atPath: canonicalDir.path))  // 完全删除
         let lock = try LockFile.decode(from: Data(contentsOf: lockPath))
         #expect(lock.skills.isEmpty)
     }
