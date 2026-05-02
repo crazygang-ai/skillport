@@ -11,6 +11,7 @@ struct RootView: View {
         } detail: {
             DetailArea()
         }
+        .overlay { NotificationHost() }
     }
 }
 
