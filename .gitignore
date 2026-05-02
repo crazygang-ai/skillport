@@ -1,0 +1,39 @@
+# Xcode
+*.xcodeproj/
+!*.xcodeproj/project.pbxproj
+*.xcworkspace/xcuserdata/
+*.xcuserstate
+*.xcuserdatad/
+DerivedData/
+build/DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/xcode/xcuserdata/
+.swiftpm/xcode/*.xcworkspace/xcuserdata/
+.swiftpm/configuration/
+Package.pins
+
+# XcodeGen 生成物
+/Skillport.xcodeproj/
+
+# macOS
+.DS_Store
+
+# Release artifacts
+/release/
+/Archive.xcarchive/
+/Export/
+
+# Sparkle private keys (must never be committed)
+sparkle_eddsa_private_key
+*.ed25519
+
+# Editor
+.idea/
+.vscode/
+*.swp
