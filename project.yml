@@ -6,6 +6,10 @@ options:
   createIntermediateGroups: true
   xcodeVersion: "16.0"
   generateEmptyDirectories: true
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.6.0"
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -23,6 +27,8 @@ targets:
       - Domain
     resources:
       - App/Resources
+    dependencies:
+      - package: Sparkle
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.crazygang.Skillport
