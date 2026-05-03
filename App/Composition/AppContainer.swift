@@ -8,7 +8,10 @@ public final class AppContainer {
     public let settingsModel: SettingsModel
     public let updateModel: UpdateModel
     public let notificationModel: NotificationModel
+    public let registryModel: RegistryModel
     public let manager: SkillManagerActor
+    public let registryActor: RegistryActor
+    public let contentFetcher: SkillContentFetcher
 
     public init(home: URL = URL(fileURLWithPath: NSHomeDirectory())) {
         self.home = home
@@ -33,6 +36,22 @@ public final class AppContainer {
             lockFile: lockFile
         )
         self.manager = manager
+
+        // Registry stack (M5)
+        let session = NetworkSession.makeSession(proxy: ProxyConfig())
+        let registryActor = RegistryActor(session: session)
+        let contentFetcher = SkillContentFetcher(session: session)
+        self.registryActor = registryActor
+        self.contentFetcher = contentFetcher
+        self.registryModel = RegistryModel(
+            registry: registryActor,
+            contentFetcher: contentFetcher,
+            installHandler: { owner, repo, ref, installTo in
+                try await manager.installGitHub(
+                    owner: owner, repo: repo, ref: ref,
+                    home: home, installTo: installTo)
+            }
+        )
 
         self.appModel = AppModel()
         self.skillsModel = SkillsModel(manager: manager, home: home)

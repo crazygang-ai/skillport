@@ -12,6 +12,7 @@ struct SkillportApp: App {
                 .environment(container.notificationModel)
                 .environment(container.settingsModel)
                 .environment(container.updateModel)
+                .environment(container.registryModel)
                 .task {
                     try? await container.skillsModel.refresh()
                     await container.skillsModel.startWatching()
