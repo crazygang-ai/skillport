@@ -1,0 +1,21 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Skillport Updates</title>
+        <link>{{APPCAST_URL}}</link>
+        <description>Most recent Skillport releases</description>
+        <language>en</language>
+        <item>
+            <title>Version {{VERSION}}</title>
+            <pubDate>{{PUBDATE}}</pubDate>
+            <enclosure
+                url="{{DMG_URL}}"
+                sparkle:version="{{VERSION}}"
+                sparkle:shortVersionString="{{VERSION}}"
+                length="{{LENGTH}}"
+                type="application/octet-stream"
+                sparkle:edSignature="{{SIGNATURE}}"/>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+        </item>
+    </channel>
+</rss>
