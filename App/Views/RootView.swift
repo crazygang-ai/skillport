@@ -23,8 +23,7 @@ private struct DetailArea: View {
         case .dashboard:
             DashboardView()
         case .registry:
-            Text("Registry — 接在下一份 plan 的 M5")
-                .foregroundStyle(.secondary)
+            RegistryBrowserView()
         case .editor(let id):
             SkillEditorView(skillID: id)
         }
