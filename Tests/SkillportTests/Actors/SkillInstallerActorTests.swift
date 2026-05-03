@@ -157,6 +157,30 @@ struct SkillInstallerMultiSkillTests {
         }
     }
 
+    @Test("uninstall after multi-skill install removes the correct canonical dir")
+    func uninstallMultiSkill() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let bareRepo = try GitFixtures.makeBareRepoWithSubSkills(
+            under: dir.url, subs: ["alpha", "beta"])
+
+        let installer = makeInstaller(home: home)
+        _ = try await installer.installGitHub(
+            sourceURL: bareRepo, owner: "t", repo: "r", ref: "HEAD",
+            skillId: "alpha", home: home, installTo: [])
+        _ = try await installer.installGitHub(
+            sourceURL: bareRepo, owner: "t", repo: "r", ref: "HEAD",
+            skillId: "beta", home: home, installTo: [])
+
+        try await installer.uninstall(name: "alpha", home: home)
+
+        let alpha = home.appendingPathComponent(".agents/skills/alpha")
+        let beta = home.appendingPathComponent(".agents/skills/beta")
+        #expect(!FileManager.default.fileExists(atPath: alpha.path))
+        #expect(FileManager.default.fileExists(atPath: beta.path))
+    }
+
     private func makeInstaller(home: URL) -> SkillInstallerActor {
         SkillInstallerActor(
             git: GitActor(),
