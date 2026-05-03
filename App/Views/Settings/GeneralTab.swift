@@ -7,6 +7,8 @@ struct GeneralTab: View {
     private let locales: [(String, String)] = [
         ("en", "English"),
         ("zh-Hans", "简体中文"),
+        ("zh-Hant", "繁體中文"),
+        ("ja", "日本語"),
     ]
 
     var body: some View {
