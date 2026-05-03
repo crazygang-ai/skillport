@@ -31,6 +31,19 @@ Native macOS app for managing AI agent skills. Rewrite of [SkillPilot](https://g
 open Skillport.xcodeproj
 ```
 
+## Release
+
+See [docs/RELEASE-SETUP.md](docs/RELEASE-SETUP.md) for first-time Developer ID / notarize / Sparkle appcast setup.
+
+Once configured, cut a release with:
+
+```bash
+./Scripts/release.sh X.Y.Z
+./Scripts/notarize.sh build/export-X.Y.Z/Skillport.app
+./Scripts/publish-appcast.sh build/export-X.Y.Z X.Y.Z
+git push && git push --tags
+```
+
 ## License
 
 MIT
