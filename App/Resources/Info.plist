@@ -22,6 +22,10 @@
     <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>SUFeedURL</key>
+    <string>https://YOUR_DOMAIN/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>YOUR_PUBLIC_ED25519_KEY_BASE64</string>
     <key>CFBundleURLTypes</key>
     <array>
         <dict>

@@ -58,6 +58,6 @@ public final class AppContainer {
         self.skillsModel = SkillsModel(manager: manager, home: home)
         self.notificationModel = NotificationModel()
         self.settingsModel = SettingsModel(proxyActor: ProxySettingsActor())
-        self.updateModel = UpdateModel(bridge: AppUpdaterBridge(feedURL: nil))
+        self.updateModel = UpdateModel(bridge: AppUpdaterBridge())
     }
 }

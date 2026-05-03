@@ -3,8 +3,7 @@ import Observation
 import Sparkle
 
 /// 包装 Sparkle 的 SPUStandardUpdaterController。
-/// 在 M1 阶段接受 nil feedURL 以便 app 能裸启动；
-/// 实际 appcast 在 M7 milestone 接入。
+/// feedURL 默认从 Info.plist 的 `SUFeedURL` 读取；若为占位符（含 "YOUR_DOMAIN"）则禁用自动检查。
 @MainActor
 @Observable
 public final class AppUpdaterBridge {
@@ -14,14 +13,15 @@ public final class AppUpdaterBridge {
 
     private let controller: SPUStandardUpdaterController?
 
-    public init(feedURL: URL?) {
-        if let feedURL {
+    public init(feedURL: URL? = nil) {
+        let effective = feedURL ?? Self.feedURLFromInfoPlist()
+        if let effective {
             let controller = SPUStandardUpdaterController(
                 startingUpdater: true,
                 updaterDelegate: nil,
                 userDriverDelegate: nil
             )
-            controller.updater.setFeedURL(feedURL)
+            controller.updater.setFeedURL(effective)
             self.controller = controller
         } else {
             self.controller = nil
@@ -32,4 +32,17 @@ public final class AppUpdaterBridge {
         controller?.updater.checkForUpdates()
         latestCheckDate = Date()
     }
+
+    /// Read SUFeedURL from Info.plist; return nil for placeholder or missing entries.
+    private static func feedURLFromInfoPlist() -> URL? {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String,
+            !raw.isEmpty,
+            !raw.contains("YOUR_DOMAIN"),
+            let url = URL(string: raw)
+        else {
+            return nil
+        }
+        return url
+    }
 }
+
