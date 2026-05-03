@@ -129,6 +129,62 @@ struct RegistryE2ETests {
         let captured = await receivedBox.skillId
         #expect(captured == "subsk")
     }
+
+    @Test("multi-skill E2E: search → select subskill → install extracts subdir only")
+    func multiSkillInstallEndToEnd() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let bareRepo = try GitFixtures.makeBareRepoWithSubSkills(
+            under: dir.url, subs: ["pilot", "scout"])
+
+        MockURLProtocol.resetSync()
+        let json =
+            #"{"skills":[{"id":"test/example/pilot","skillId":"pilot","name":"pilot","installs":0,"source":"test/example"}]}"#
+        MockURLProtocol.stub(
+            urlMatch: { $0.path == "/api/search" },
+            status: 200, body: Data(json.utf8)
+        )
+
+        let registry = RegistryActor(session: MockURLProtocol.makeSession())
+        let fetcher = SkillContentFetcher(session: MockURLProtocol.makeSession())
+        let git = GitActor()
+        let symlinker = SymlinkManagerActor()
+        let lockFile = LockFileActor(
+            path: home.appendingPathComponent(".agents/.skill-lock.json"))
+        let cache = CommitHashCache(
+            path: home.appendingPathComponent(".agents/.cache.json"))
+        let installer = SkillInstallerActor(
+            git: git, symlinker: symlinker, lockFile: lockFile, cache: cache)
+
+        let model = RegistryModel(
+            registry: registry, contentFetcher: fetcher,
+            installHandler: { _, _, ref, skillId, installTo in
+                try await installer.installGitHub(
+                    sourceURL: bareRepo,
+                    owner: "test", repo: "example", ref: ref,
+                    skillId: skillId, home: home, installTo: installTo)
+            }
+        )
+
+        model.searchInput = "pilot"
+        await model.runSearchNow()
+        #expect(model.skills.count == 1)
+        await model.select(id: "test/example/pilot")
+        model.selectedAgentsForInstall = []  // 不 install 到 agent, 只验 canonical
+        let result = await model.installSelected()
+        if case .failure(let err) = result {
+            Issue.record("install failed: \(err)")
+        }
+        // canonical dir 是 pilot 不是 example
+        let pilotDir = home.appendingPathComponent(".agents/skills/pilot")
+        #expect(
+            FileManager.default.fileExists(
+                atPath: pilotDir.appendingPathComponent("SKILL.md").path))
+        // scout 没被拉过来
+        let scoutDir = home.appendingPathComponent(".agents/skills/scout")
+        #expect(!FileManager.default.fileExists(atPath: scoutDir.path))
+    }
 }
 
 /// Test helper — thread-safe box to capture skillId from @Sendable install handler.
