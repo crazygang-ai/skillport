@@ -9,17 +9,21 @@ enum MarkdownRenderer {
     static func renderToAttributed(_ markdown: String) -> NSAttributedString {
         let doc = Document(parsing: markdown)
         let out = NSMutableAttributedString()
-        renderChildren(of: doc, into: out)
+        renderChildren(of: doc, into: out, indent: 0)
         return out
     }
 
-    private static func renderChildren(of node: Markup, into out: NSMutableAttributedString) {
+    private static func renderChildren(
+        of node: Markup, into out: NSMutableAttributedString, indent: Int
+    ) {
         for child in node.children {
-            renderNode(child, into: out)
+            renderNode(child, into: out, indent: indent)
         }
     }
 
-    private static func renderNode(_ node: Markup, into out: NSMutableAttributedString) {
+    private static func renderNode(
+        _ node: Markup, into out: NSMutableAttributedString, indent: Int
+    ) {
         switch node {
         case let heading as Heading:
             let size: CGFloat = max(13, CGFloat(28 - heading.level * 2))
@@ -48,22 +52,37 @@ enum MarkdownRenderer {
             out.append(NSAttributedString(string: "\n"))
         case let ul as UnorderedList:
             for item in ul.listItems {
+                out.append(NSAttributedString(string: String(repeating: "  ", count: indent)))
                 out.append(NSAttributedString(string: "• "))
-                renderChildren(of: item, into: out)
+                renderChildren(of: item, into: out, indent: indent + 1)
             }
         case let ol as OrderedList:
             var idx = 1
             for item in ol.listItems {
+                out.append(NSAttributedString(string: String(repeating: "  ", count: indent)))
                 out.append(NSAttributedString(string: "\(idx). "))
-                renderChildren(of: item, into: out)
+                renderChildren(of: item, into: out, indent: indent + 1)
                 idx += 1
             }
         case let block as BlockQuote:
             let start = out.length
-            renderChildren(of: block, into: out)
+            renderChildren(of: block, into: out, indent: indent)
             out.addAttribute(
                 .foregroundColor, value: NSColor.secondaryLabelColor,
                 range: NSRange(location: start, length: out.length - start))
+        case let table as Markdown.Table:
+            let headerLine = table.head.cells.map { $0.plainText }.joined(separator: " | ")
+            let h = NSMutableAttributedString(string: headerLine + "\n")
+            h.addAttribute(
+                .font, value: NSFont.boldSystemFont(ofSize: NSFont.systemFontSize),
+                range: NSRange(location: 0, length: headerLine.count))
+            out.append(h)
+            out.append(NSAttributedString(string: String(repeating: "-", count: 40) + "\n"))
+            for row in table.body.rows {
+                let line = row.cells.map { $0.plainText }.joined(separator: " | ")
+                out.append(NSAttributedString(string: line + "\n"))
+            }
+            out.append(NSAttributedString(string: "\n"))
         default:
             out.append(NSAttributedString(string: node.format()))
         }
@@ -102,6 +121,16 @@ enum MarkdownRenderer {
             s.addAttribute(
                 .font, value: NSFont.boldSystemFont(ofSize: NSFont.systemFontSize),
                 range: NSRange(location: 0, length: s.length))
+            out.append(s)
+        case let image as Markdown.Image:
+            let alt = image.plainText.isEmpty ? "image" : image.plainText
+            let url = image.source ?? ""
+            let s = NSMutableAttributedString(string: "[Image: \(alt) — \(url)]")
+            s.addAttributes(
+                [
+                    .font: NSFont.systemFont(ofSize: 11),
+                    .foregroundColor: NSColor.secondaryLabelColor,
+                ], range: NSRange(location: 0, length: s.length))
             out.append(s)
         default:
             out.append(NSAttributedString(string: node.format()))
