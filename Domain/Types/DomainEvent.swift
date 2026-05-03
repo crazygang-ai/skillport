@@ -17,6 +17,10 @@ public enum DomainEvent: Sendable {
     case notification(level: NotificationLevel, message: String)
     /// 错误（供 NotificationModel 展示）
     case error(SkillportError)
+    /// Registry leaderboard 拉取完成（供观测/测试用）
+    case registryLeaderboardLoaded(category: LeaderboardCategory, count: Int)
+    /// Registry skill 内容 fetch 完成
+    case registryContentFetched(source: String, skillId: String, bytes: Int)
 }
 
 public enum NotificationLevel: Sendable, Equatable {
