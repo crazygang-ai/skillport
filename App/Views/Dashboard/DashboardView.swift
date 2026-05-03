@@ -13,13 +13,7 @@ struct DashboardView: View {
             if skillsModel.isScanning {
                 ProgressView(String(localized: "Scanning…"))
             } else if list.isEmpty {
-                ContentUnavailableView(
-                    String(localized: "No skills yet"),
-                    systemImage: "sparkles",
-                    description: Text(
-                        String(
-                            localized: "Drop a folder with SKILL.md here to import, or use ⌘N."))
-                )
+                emptyState
             } else {
                 List(list) { skill in
                     SkillRow(
@@ -61,6 +55,31 @@ struct DashboardView: View {
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             Task { [providers] in await handleDrop(providers: providers) }
             return true
+        }
+    }
+
+    @ViewBuilder
+    private var emptyState: some View {
+        if let agent = app.currentAgentFilter, !skillsModel.skills.isEmpty {
+            // 有 skills 但没有装到当前 agent
+            ContentUnavailableView(
+                String(localized: "No skills installed to \(agent.displayName)"),
+                systemImage: "cube",
+                description: Text(
+                    String(
+                        localized:
+                            "Clear the agent filter (click title) and toggle \(agent.displayName) on a skill."
+                    ))
+            )
+        } else {
+            // 完全没 skills
+            ContentUnavailableView(
+                String(localized: "No skills yet"),
+                systemImage: "sparkles",
+                description: Text(
+                    String(
+                        localized: "Drop a folder with SKILL.md here to import, or use ⌘N."))
+            )
         }
     }
 

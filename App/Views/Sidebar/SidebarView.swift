@@ -6,44 +6,60 @@ struct SidebarView: View {
 
     var body: some View {
         @Bindable var app = app
-        List(
-            selection: Binding(
-                get: { app.currentAgentFilter },
-                set: { app.selectAgent($0) }
-            )
-        ) {
-            Section(String(localized: "Views")) {
-                Button {
-                    app.setSection(.dashboard)
-                } label: {
-                    Label(String(localized: "Dashboard"), systemImage: "square.grid.2x2")
-                }
-                Button {
-                    app.setSection(.registry)
-                } label: {
-                    Label(String(localized: "Registry"), systemImage: "books.vertical")
-                }
+        VStack(spacing: 0) {
+            // Section switcher — lives outside the selection List so its taps are not swallowed.
+            Picker("", selection: sectionBinding) {
+                Label(String(localized: "Dashboard"), systemImage: "square.grid.2x2")
+                    .tag(SectionTag.dashboard)
+                Label(String(localized: "Registry"), systemImage: "books.vertical")
+                    .tag(SectionTag.registry)
             }
-            .buttonStyle(.plain)
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(8)
 
-            Section(String(localized: "Filter by agent")) {
-                ForEach(skillsModel.agents, id: \.id) { agent in
-                    NavigationLink(value: agent.id) {
-                        HStack {
+            Divider()
+
+            // Agent filter list
+            List(
+                selection: Binding(
+                    get: { app.currentAgentFilter },
+                    set: { app.selectAgent($0) }
+                )
+            ) {
+                Section(String(localized: "Filter by agent")) {
+                    ForEach(skillsModel.agents, id: \.id) { agent in
+                        NavigationLink(value: agent.id) {
                             Label(agent.id.displayName, systemImage: "cube")
-                            Spacer()
-                            Text("\(count(for: agent.id))")
-                                .foregroundStyle(.secondary)
-                                .font(.caption)
                         }
                     }
                 }
             }
+            .listStyle(.sidebar)
         }
-        .listStyle(.sidebar)
     }
 
-    private func count(for id: AgentID) -> Int {
-        skillsModel.skillsFiltered(by: id).count
+    // MARK: - Section binding
+
+    private enum SectionTag: Hashable {
+        case dashboard
+        case registry
+    }
+
+    private var sectionBinding: Binding<SectionTag> {
+        Binding(
+            get: {
+                switch app.section {
+                case .registry: return .registry
+                default: return .dashboard
+                }
+            },
+            set: { tag in
+                switch tag {
+                case .dashboard: app.setSection(.dashboard)
+                case .registry: app.setSection(.registry)
+                }
+            }
+        )
     }
 }
