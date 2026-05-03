@@ -29,3 +29,70 @@ struct SettingsModelTests {
         #expect(model.proxy == new)
     }
 }
+
+@Suite("SettingsModel — M6 extensions", .serialized)
+@MainActor
+struct SettingsModelM6Tests {
+    @Test("preferredLocale reads from AppleLanguages[0] when present")
+    func localeFromAppleLanguages() async {
+        let suite = "test-\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.set(["ja", "en"], forKey: "AppleLanguages")
+        let model = SettingsModel(
+            proxyActor: ProxySettingsActor(suiteName: nil),
+            keychain: KeychainActor(service: "skillport-test-\(UUID())"),
+            defaults: defaults
+        )
+        #expect(model.preferredLocale == "ja")
+        defaults.removePersistentDomain(forName: suite)
+    }
+
+    @Test("setPreferredLocale writes AppleLanguages array into UserDefaults")
+    func persistLocale() async {
+        let suite = "test-\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        let model = SettingsModel(
+            proxyActor: ProxySettingsActor(suiteName: nil),
+            keychain: KeychainActor(service: "skillport-test-\(UUID())"),
+            defaults: defaults
+        )
+        model.setPreferredLocale("zh-Hans")
+        #expect(model.preferredLocale == "zh-Hans")
+        let arr = defaults.array(forKey: "AppleLanguages") as? [String] ?? []
+        #expect(arr.first == "zh-Hans")
+        defaults.removePersistentDomain(forName: suite)
+    }
+
+    @Test("autoCheckUpdates default true; toggling persists")
+    func autoCheckDefault() async {
+        let suite = "test-\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        let model = SettingsModel(
+            proxyActor: ProxySettingsActor(suiteName: nil),
+            keychain: KeychainActor(service: "skillport-test-\(UUID())"),
+            defaults: defaults
+        )
+        #expect(model.autoCheckUpdates == true)
+        model.autoCheckUpdates = false
+        #expect(defaults.bool(forKey: "autoCheckUpdates") == false)
+        defaults.removePersistentDomain(forName: suite)
+    }
+
+    @Test("setProxyPassword stores in Keychain; readProxyPassword retrieves")
+    func keychainRoundtrip() async throws {
+        let svc = "skillport-test-\(UUID())"
+        let kc = KeychainActor(service: svc)
+        let suite = "test-\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        let model = SettingsModel(
+            proxyActor: ProxySettingsActor(suiteName: nil),
+            keychain: kc,
+            defaults: defaults
+        )
+        try await model.setProxyPassword("sekret")
+        let read = try await model.readProxyPassword()
+        #expect(read == "sekret")
+        try? await kc.remove(account: "proxy")
+        defaults.removePersistentDomain(forName: suite)
+    }
+}
