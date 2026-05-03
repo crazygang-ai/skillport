@@ -5,59 +5,59 @@ struct SidebarView: View {
     @Environment(SkillsModel.self) private var skillsModel
 
     var body: some View {
-        @Bindable var app = app
-        VStack(spacing: 0) {
-            // Section switcher — lives outside the selection List so its taps are not swallowed.
-            Picker("", selection: sectionBinding) {
+        List(selection: selectionBinding) {
+            Section(String(localized: "Views")) {
                 Label(String(localized: "Dashboard"), systemImage: "square.grid.2x2")
-                    .tag(SectionTag.dashboard)
+                    .tag(SidebarSelection.dashboard)
                 Label(String(localized: "Registry"), systemImage: "books.vertical")
-                    .tag(SectionTag.registry)
+                    .tag(SidebarSelection.registry)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .padding(8)
 
-            Divider()
-
-            // Agent filter list
-            List(
-                selection: Binding(
-                    get: { app.currentAgentFilter },
-                    set: { app.selectAgent($0) }
-                )
-            ) {
-                Section(String(localized: "Filter by agent")) {
-                    ForEach(skillsModel.agents, id: \.id) { agent in
-                        NavigationLink(value: agent.id) {
-                            Label(agent.id.displayName, systemImage: "cube")
-                        }
-                    }
+            Section(String(localized: "Filter by agent")) {
+                ForEach(skillsModel.agents, id: \.id) { agent in
+                    Label(agent.id.displayName, systemImage: "cube")
+                        .tag(SidebarSelection.agent(agent.id))
                 }
             }
-            .listStyle(.sidebar)
         }
+        .listStyle(.sidebar)
     }
 
-    // MARK: - Section binding
+    // MARK: - Unified sidebar selection
 
-    private enum SectionTag: Hashable {
+    private enum SidebarSelection: Hashable {
         case dashboard
         case registry
+        case agent(AgentID)
     }
 
-    private var sectionBinding: Binding<SectionTag> {
+    private var selectionBinding: Binding<SidebarSelection?> {
         Binding(
             get: {
                 switch app.section {
-                case .registry: return .registry
-                default: return .dashboard
+                case .registry:
+                    return .registry
+                case .editor:
+                    // editor 时 sidebar 仍高亮 Dashboard (editor 是从 Dashboard 点进去的)
+                    if let id = app.currentAgentFilter { return .agent(id) }
+                    return .dashboard
+                case .dashboard:
+                    if let id = app.currentAgentFilter { return .agent(id) }
+                    return .dashboard
                 }
             },
-            set: { tag in
-                switch tag {
-                case .dashboard: app.setSection(.dashboard)
-                case .registry: app.setSection(.registry)
+            set: { new in
+                guard let new else { return }
+                switch new {
+                case .dashboard:
+                    app.setSection(.dashboard)
+                    app.selectAgent(nil)
+                case .registry:
+                    app.setSection(.registry)
+                    app.selectAgent(nil)
+                case .agent(let id):
+                    app.setSection(.dashboard)
+                    app.selectAgent(id)
                 }
             }
         )
