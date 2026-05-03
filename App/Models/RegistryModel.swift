@@ -5,10 +5,11 @@ import Observation
 @Observable
 public final class RegistryModel {
     /// 闭包解耦: 让 model 不必直接依赖整个 SkillManagerActor, 便于测试。
-    public typealias InstallHandler = @Sendable (
-        _ owner: String, _ repo: String, _ ref: String,
-        _ installTo: Set<AgentID>
-    ) async throws -> Skill
+    public typealias InstallHandler =
+        @Sendable (
+            _ owner: String, _ repo: String, _ ref: String,
+            _ installTo: Set<AgentID>
+        ) async throws -> Skill
 
     public var searchInput: String = "" {
         didSet { scheduleDebouncedSearch() }
