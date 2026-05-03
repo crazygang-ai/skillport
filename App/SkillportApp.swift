@@ -5,7 +5,7 @@ struct SkillportApp: App {
     @State private var container = AppContainer()
 
     var body: some Scene {
-        WindowGroup("Skillport") {
+        WindowGroup("Skillport", id: "main") {
             RootView()
                 .environment(container.appModel)
                 .environment(container.skillsModel)
@@ -59,5 +59,12 @@ struct SkillportApp: App {
                 .environment(container.notificationModel)
                 .environment(container.updateModel)
         }
+
+        MenuBarExtra("Skillport", systemImage: "cube.box") {
+            MenuBarContentView()
+                .environment(container.skillsModel)
+                .environment(container.updateModel)
+        }
+        .menuBarExtraStyle(.window)
     }
 }
