@@ -97,16 +97,12 @@ struct RegistryDetailPanel: View {
             } label: {
                 HStack {
                     Spacer()
-                    Text(
-                        skill.isSingleSkillRepo
-                            ? String(localized: "Install")
-                            : String(localized: "Multi-skill repo — use CLI above")
-                    )
+                    Text(String(localized: "Install"))
                     Spacer()
                 }
                 .padding(.vertical, 6)
             }
-            .disabled(!skill.isSingleSkillRepo || model.selectedAgentsForInstall.isEmpty)
+            .disabled(model.selectedAgentsForInstall.isEmpty)
             .buttonStyle(.borderedProminent)
         }
         .padding()
