@@ -65,4 +65,24 @@ struct RegistryContentRendererTests {
             Issue.record("expected .markdown")
         }
     }
+
+    @Test("nested lists render with indentation preserved")
+    func nestedListsRender() throws {
+        let md = """
+            - top
+              - nested
+              - also nested
+            - sibling
+            """
+        switch try renderer.render(md) {
+        case .markdown(let str):
+            let text = String(str.characters)
+            #expect(text.contains("top"))
+            #expect(text.contains("nested"))
+            #expect(text.contains("also nested"))
+            #expect(text.contains("sibling"))
+        default:
+            Issue.record("expected .markdown")
+        }
+    }
 }

@@ -71,16 +71,15 @@ public struct RegistryContentRenderer {
     // MARK: - Markdown → AttributedString
 
     /// 极简渲染 — 递归遍历 Markup 节点, 为各类型节点附加字体/样式。
-    /// 表格、图片暂不渲染 (M6/M7 补)。
     private func renderMarkdown(_ markup: Markup) -> AttributedString {
         var acc = AttributedString()
         for child in markup.children {
-            acc.append(renderNode(child))
+            acc.append(renderNode(child, indent: 0))
         }
         return acc
     }
 
-    private func renderNode(_ node: Markup) -> AttributedString {
+    private func renderNode(_ node: Markup, indent: Int = 0) -> AttributedString {
         switch node {
         case let heading as Heading:
             var s = AttributedString(heading.plainText)
@@ -93,7 +92,7 @@ public struct RegistryContentRenderer {
             for child in paragraph.children {
                 acc.append(renderInline(child))
             }
-            acc.append(AttributedString("\n\n"))
+            acc.append(AttributedString("\n"))
             return acc
         case let code as CodeBlock:
             var s = AttributedString(code.code)
@@ -103,9 +102,10 @@ public struct RegistryContentRenderer {
         case let ul as UnorderedList:
             var acc = AttributedString()
             for item in ul.listItems {
+                acc.append(AttributedString(String(repeating: "  ", count: indent)))
                 acc.append(AttributedString("• "))
                 for child in item.children {
-                    acc.append(renderNode(child))
+                    acc.append(renderNode(child, indent: indent + 1))
                 }
             }
             return acc
@@ -113,9 +113,10 @@ public struct RegistryContentRenderer {
             var acc = AttributedString()
             var idx = 1
             for item in ol.listItems {
+                acc.append(AttributedString(String(repeating: "  ", count: indent)))
                 acc.append(AttributedString("\(idx). "))
                 for child in item.children {
-                    acc.append(renderNode(child))
+                    acc.append(renderNode(child, indent: indent + 1))
                 }
                 idx += 1
             }
@@ -123,7 +124,7 @@ public struct RegistryContentRenderer {
         case let block as BlockQuote:
             var acc = AttributedString()
             for child in block.children {
-                acc.append(renderNode(child))
+                acc.append(renderNode(child, indent: indent))
             }
             return acc
         default:
