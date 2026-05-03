@@ -85,4 +85,38 @@ struct RegistryContentRendererTests {
             Issue.record("expected .markdown")
         }
     }
+
+    @Test("markdown tables render as pipe-separated text with bold header")
+    func tableRender() throws {
+        let md = """
+            | Name | Stars |
+            |------|-------|
+            | foo  | 100   |
+            | bar  | 50    |
+            """
+        switch try renderer.render(md) {
+        case .markdown(let str):
+            let text = String(str.characters)
+            #expect(text.contains("Name"))
+            #expect(text.contains("Stars"))
+            #expect(text.contains("foo"))
+            #expect(text.contains("100"))
+        default:
+            Issue.record("expected .markdown")
+        }
+    }
+
+    @Test("markdown images render as text placeholder")
+    func imagePlaceholder() throws {
+        let md = "![logo](https://example.com/logo.png)"
+        switch try renderer.render(md) {
+        case .markdown(let str):
+            let text = String(str.characters)
+            #expect(text.contains("Image"))
+            #expect(text.contains("logo"))
+            #expect(text.contains("example.com/logo.png"))
+        default:
+            Issue.record("expected .markdown")
+        }
+    }
 }

@@ -170,6 +170,13 @@ public struct RegistryContentRenderer {
             var s = AttributedString(strong.plainText)
             s.font = .system(.body, weight: .bold)
             return s
+        case let image as Markdown.Image:
+            let alt = image.plainText.isEmpty ? "image" : image.plainText
+            let url = image.source ?? ""
+            var s = AttributedString("[Image: \(alt) — \(url)]")
+            s.font = .system(.caption, weight: .regular)
+            s.foregroundColor = .secondary
+            return s
         default:
             return AttributedString(node.format())
         }
