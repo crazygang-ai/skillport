@@ -8,7 +8,6 @@ struct SkillContentFetcherTests {
     @Test("Returns first 200 response among parallel candidates")
     func racesCandidates() async throws {
         await MockURLProtocol.reset()
-        // 三条候选，只有一条返回 200
         let fast = URL(string: "https://raw.test/a/SKILL.md")!
         let slow = URL(string: "https://raw.test/b/SKILL.md")!
         let bad = URL(string: "https://raw.test/c/SKILL.md")!
@@ -49,4 +48,120 @@ struct SkillContentFetcherTests {
         cfg.protocolClasses = [MockURLProtocol.self] + (cfg.protocolClasses ?? [])
         return URLSession(configuration: cfg)
     }
+}
+
+@Suite("SkillContentFetcher — 3-tier cascade", .serialized)
+struct SkillContentFetcherCascadeTests {
+    @Test("strategy 1 wins when any raw URL candidate returns 200")
+    func strategy1Wins() async throws {
+        MockURLProtocol.resetSync()
+        MockURLProtocol.stub(
+            urlMatch: {
+                $0.host == "raw.githubusercontent.com" && $0.path.hasSuffix("/main/SKILL.md")
+            },
+            status: 200,
+            body: Data("# hello from raw".utf8)
+        )
+        let fetcher = SkillContentFetcher(session: MockURLProtocol.makeSession())
+        let content = try await fetcher.fetchContent(source: "owner/repo", skillId: "repo")
+        #expect(content.contains("# hello from raw"))
+        let touched = MockURLProtocol.requestLog.map { $0.url?.host ?? "" }
+        #expect(!touched.contains("skills.sh"))
+        #expect(!touched.contains("api.github.com"))
+    }
+
+    @Test("strategy 2 fires when all raw URLs fail; returns HTML prefixed content")
+    func strategy2SkillsShFallback() async throws {
+        MockURLProtocol.resetSync()
+        MockURLProtocol.stub(
+            urlMatch: { $0.host == "raw.githubusercontent.com" },
+            status: 404,
+            body: Data()
+        )
+        let rsc = makeFakeRSCPayload(
+            htmlBody: "<h1>docs</h1><p>long enough to pass the fifty byte threshold</p>")
+        MockURLProtocol.stub(
+            urlMatch: { $0.host == "skills.sh" },
+            status: 200,
+            body: Data(rsc.utf8)
+        )
+        let fetcher = SkillContentFetcher(session: MockURLProtocol.makeSession())
+        let content = try await fetcher.fetchContent(source: "owner/repo", skillId: "sub")
+        #expect(content.hasPrefix("<!-- HTML -->"))
+        #expect(content.contains("<h1>docs</h1>"))
+    }
+
+    @Test("strategy 3 hits Tree API + raw file when strategies 1 and 2 both fail")
+    func strategy3TreeAPI() async throws {
+        MockURLProtocol.resetSync()
+        MockURLProtocol.stub(
+            urlMatch: {
+                $0.host == "raw.githubusercontent.com" && !$0.path.contains("skills/sub/SKILL.md")
+            },
+            status: 404,
+            body: Data()
+        )
+        MockURLProtocol.stub(urlMatch: { $0.host == "skills.sh" }, status: 404, body: Data())
+        let tree = #"{"tree":[{"path":"skills/sub/SKILL.md","type":"blob"}]}"#
+        MockURLProtocol.stub(
+            urlMatch: { $0.host == "api.github.com" && $0.path.hasSuffix("git/trees/main") },
+            status: 200,
+            body: Data(tree.utf8)
+        )
+        MockURLProtocol.stub(
+            urlMatch: {
+                $0.host == "raw.githubusercontent.com" && $0.path.hasSuffix("skills/sub/SKILL.md")
+            },
+            status: 200,
+            body: Data("# from tree".utf8)
+        )
+        let fetcher = SkillContentFetcher(session: MockURLProtocol.makeSession())
+        let content = try await fetcher.fetchContent(source: "owner/repo", skillId: "sub")
+        #expect(content.contains("# from tree"))
+    }
+
+    @Test("content is cached for subsequent calls within TTL")
+    func cacheHit() async throws {
+        MockURLProtocol.resetSync()
+        MockURLProtocol.stub(
+            urlMatch: { $0.host == "raw.githubusercontent.com" },
+            status: 200,
+            body: Data("# cached".utf8)
+        )
+        let fetcher = SkillContentFetcher(session: MockURLProtocol.makeSession())
+        _ = try await fetcher.fetchContent(source: "owner/repo", skillId: "repo")
+        let firstCount = MockURLProtocol.requestLog.count
+        MockURLProtocol.clearRequestLog()
+        _ = try await fetcher.fetchContent(source: "owner/repo", skillId: "repo")
+        let secondCount = MockURLProtocol.requestLog.count
+        #expect(firstCount >= 1)
+        #expect(secondCount == 0)
+    }
+
+    @Test("GitHub API rate-limit response sets internal reset timer")
+    func rateLimitBackoff() async throws {
+        MockURLProtocol.resetSync()
+        MockURLProtocol.stub(
+            urlMatch: { $0.host == "raw.githubusercontent.com" }, status: 404, body: Data())
+        MockURLProtocol.stub(urlMatch: { $0.host == "skills.sh" }, status: 404, body: Data())
+        let futureReset = String(Int(Date().addingTimeInterval(3600).timeIntervalSince1970))
+        MockURLProtocol.stub(
+            urlMatch: { $0.host == "api.github.com" },
+            status: 403,
+            headers: ["x-ratelimit-remaining": "0", "x-ratelimit-reset": futureReset],
+            body: Data()
+        )
+        let fetcher = SkillContentFetcher(session: MockURLProtocol.makeSession())
+        _ = try? await fetcher.fetchContent(source: "a/b", skillId: "x")
+        MockURLProtocol.clearRequestLog()
+        _ = try? await fetcher.fetchContent(source: "c/d", skillId: "y")
+        let githubApiCalls = MockURLProtocol.requestLog.filter { $0.url?.host == "api.github.com" }
+        #expect(githubApiCalls.count == 0)
+    }
+}
+
+/// Fake RSC payload with a `a:T{sizeHex},{body}` chunk for Strategy 2 tests.
+private func makeFakeRSCPayload(htmlBody: String) -> String {
+    let size = String(htmlBody.utf8.count, radix: 16)
+    return "a:T\(size),\(htmlBody)\nb:T1,x\n"
 }
