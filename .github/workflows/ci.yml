@@ -16,8 +16,10 @@ jobs:
         run: ./Scripts/bootstrap.sh
       - name: Generate project
         run: ./Scripts/generate-project.sh
+      - name: Check parser parity
+        run: ./Scripts/check-parser-parity.sh
       - name: Lint
-        run: swift-format lint --recursive App Domain Tests
+        run: swift-format lint --recursive App Domain Tests SkillportPreview
       - name: Build & Test
         run: |
           set -o pipefail
