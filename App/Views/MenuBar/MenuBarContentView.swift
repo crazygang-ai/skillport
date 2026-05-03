@@ -25,6 +25,19 @@ struct MenuBarContentView: View {
             )
             .font(.caption)
 
+            let updatable = skills.skills.filter {
+                if case .available = $0.updateStatus { return true }
+                return false
+            }.count
+            if updatable > 0 {
+                Label(
+                    String(localized: "\(updatable) skill updates available"),
+                    systemImage: "arrow.down.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
+            }
+
             Divider()
             Button {
                 openWindow(id: "main")
