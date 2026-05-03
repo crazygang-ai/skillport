@@ -36,7 +36,9 @@ struct DashboardView: View {
                                     notifications.post(
                                         .init(
                                             level: .error,
-                                            message: "Toggle failed: \(error)"))
+                                            message: String(
+                                                localized:
+                                                    "Toggle failed: \(error.localizedDescription)")))
                                 }
                             }
                         },
@@ -67,9 +69,16 @@ struct DashboardView: View {
             guard let url = try? await loadFileURL(from: provider) else { continue }
             do {
                 _ = try await skillsModel.installLocal(from: url, installTo: [])
-                notifications.post(.init(level: .success, message: "Imported \(url.lastPathComponent)"))
+                notifications.post(
+                    .init(
+                        level: .success,
+                        message: String(localized: "Imported \(url.lastPathComponent)")))
             } catch {
-                notifications.post(.init(level: .error, message: "Import failed: \(error)"))
+                notifications.post(
+                    .init(
+                        level: .error,
+                        message: String(
+                            localized: "Import failed: \(error.localizedDescription)")))
             }
         }
     }

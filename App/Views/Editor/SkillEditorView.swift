@@ -61,7 +61,11 @@ struct SkillEditorView: View {
                     try state.load(from: skill.path.appendingPathComponent("SKILL.md"))
                     source = state.body
                 } catch {
-                    notifications.post(.init(level: .error, message: "Load failed: \(error)"))
+                    notifications.post(
+                        .init(
+                            level: .error,
+                            message: String(
+                                localized: "Load failed: \(error.localizedDescription)")))
                 }
             }
         }
