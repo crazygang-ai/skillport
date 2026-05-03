@@ -54,7 +54,7 @@ struct RegistryE2ETests {
         case .attributed(let s):
             let text = String(s.characters)
             #expect(text.contains("hello"))
-            // sanitizer would have stripped any script/iframe; here we just verify render succeeded
+        // sanitizer would have stripped any script/iframe; here we just verify render succeeded
         default:
             Issue.record("expected .attributed branch, got \(model.rendered)")
         }
