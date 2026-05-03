@@ -88,3 +88,82 @@ struct SkillInstallerActorTests {
         #expect(!FileManager.default.fileExists(atPath: link.path))
     }
 }
+
+@Suite("SkillInstallerActor — multi-skill repos", .serialized)
+struct SkillInstallerMultiSkillTests {
+    @Test("installGitHub with skillId == repo uses single-skill path")
+    func singleSkillDefaultBehavior() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let bareRepo = try GitFixtures.makeBareRepoWithRootSKILL(under: dir.url)
+
+        let installer = makeInstaller(home: home)
+        let skill = try await installer.installGitHub(
+            sourceURL: bareRepo,
+            owner: "test", repo: "example", ref: "HEAD",
+            skillId: "example",
+            home: home, installTo: []
+        )
+        #expect(skill.name == "example")
+        let canonical = home.appendingPathComponent(".agents/skills/example")
+        #expect(
+            FileManager.default.fileExists(
+                atPath: canonical.appendingPathComponent("SKILL.md").path))
+    }
+
+    @Test("installGitHub with skillId differing from repo extracts subdir")
+    func multiSkillSubdirExtraction() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let bareRepo = try GitFixtures.makeBareRepoWithSubSkills(
+            under: dir.url, subs: ["sub1", "sub2"])
+
+        let installer = makeInstaller(home: home)
+        let skill = try await installer.installGitHub(
+            sourceURL: bareRepo,
+            owner: "test", repo: "example", ref: "HEAD",
+            skillId: "sub1",
+            home: home, installTo: []
+        )
+        #expect(skill.name == "sub1")
+
+        let canonical = home.appendingPathComponent(".agents/skills/sub1")
+        #expect(
+            FileManager.default.fileExists(
+                atPath: canonical.appendingPathComponent("SKILL.md").path))
+
+        let sub2 = home.appendingPathComponent(".agents/skills/sub2")
+        #expect(!FileManager.default.fileExists(atPath: sub2.path))
+    }
+
+    @Test("installGitHub with non-existent skillId throws")
+    func multiSkillMissingSubdir() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let bareRepo = try GitFixtures.makeBareRepoWithSubSkills(
+            under: dir.url, subs: ["sub1"])
+
+        let installer = makeInstaller(home: home)
+        await #expect(throws: SkillportError.self) {
+            _ = try await installer.installGitHub(
+                sourceURL: bareRepo,
+                owner: "test", repo: "example", ref: "HEAD",
+                skillId: "does-not-exist",
+                home: home, installTo: []
+            )
+        }
+    }
+
+    private func makeInstaller(home: URL) -> SkillInstallerActor {
+        SkillInstallerActor(
+            git: GitActor(),
+            symlinker: SymlinkManagerActor(),
+            lockFile: LockFileActor(path: home.appendingPathComponent(".agents/.skill-lock.json")),
+            cache: CommitHashCache(
+                path: home.appendingPathComponent(".agents/.skillpilot-cache.json"))
+        )
+    }
+}

@@ -56,25 +56,79 @@ public actor SkillInstallerActor {
 
     public func installGitHub(
         owner: String, repo: String, ref: String,
+        skillId: String? = nil,
         home: URL, installTo: Set<AgentID>
     ) async throws -> Skill {
         let url = URL(string: "https://github.com/\(owner)/\(repo).git")!
+        return try await installGitHub(
+            sourceURL: url,
+            owner: owner, repo: repo, ref: ref,
+            skillId: skillId ?? repo,
+            home: home, installTo: installTo
+        )
+    }
+
+    /// Testable overload — accepts any source URL (file:// for tests, https:// for prod).
+    public func installGitHub(
+        sourceURL: URL,
+        owner: String, repo: String, ref: String,
+        skillId: String,
+        home: URL, installTo: Set<AgentID>
+    ) async throws -> Skill {
         let canonicalBase = home.appendingPathComponent(".agents/skills", isDirectory: true)
-        try FileManager.default.createDirectory(at: canonicalBase, withIntermediateDirectories: true)
-        let dest = canonicalBase.appendingPathComponent(repo, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: canonicalBase, withIntermediateDirectories: true)
+        let dest = canonicalBase.appendingPathComponent(skillId, isDirectory: true)
         if FileManager.default.fileExists(atPath: dest.path) {
             throw SkillportError.fileIO(path: dest, reason: "destination already exists")
         }
-        try await git.clone(url: url, to: dest, ref: ref, depth: 1)
+
+        if skillId == repo {
+            // Single-skill: clone directly to dest.
+            if sourceURL.isFileURL {
+                try await git.cloneLocal(from: sourceURL, to: dest, depth: 1)
+            } else {
+                try await git.clone(url: sourceURL, to: dest, ref: ref, depth: 1)
+            }
+        } else {
+            // Multi-skill: clone to tmp, move matching subdir to dest.
+            let tmpBase = FileManager.default.temporaryDirectory
+                .appendingPathComponent("skillport-install-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: tmpBase) }
+            if sourceURL.isFileURL {
+                try await git.cloneLocal(from: sourceURL, to: tmpBase, depth: 1)
+            } else {
+                try await git.clone(url: sourceURL, to: tmpBase, ref: ref, depth: 1)
+            }
+
+            let candidates = [
+                tmpBase.appendingPathComponent(skillId),
+                tmpBase.appendingPathComponent("skills").appendingPathComponent(skillId),
+                tmpBase.appendingPathComponent(".claude/skills").appendingPathComponent(skillId),
+            ]
+            guard
+                let src = candidates.first(where: {
+                    FileManager.default.fileExists(
+                        atPath: $0.appendingPathComponent("SKILL.md").path)
+                })
+            else {
+                throw SkillportError.fileIO(
+                    path: tmpBase,
+                    reason: "SKILL.md not found for skillId '\(skillId)' in cloned repo"
+                )
+            }
+            try FileManager.default.moveItem(at: src, to: dest)
+        }
+
         let commitHash = try? await git.headHash(in: dest)
         let identity = SkillIdentity.compute(
-            name: repo, source: .github(owner: owner, repo: repo, ref: ref)
+            name: skillId, source: .github(owner: owner, repo: repo, ref: ref)
         )
         if let commitHash {
             try await cache.set(identity: identity, hash: commitHash)
         }
         let locked = LockedSkill(
-            name: repo,
+            name: skillId,
             source: .github(owner: owner, repo: repo, ref: ref),
             installedAt: Date(),
             commitHash: commitHash,
@@ -83,13 +137,15 @@ public actor SkillInstallerActor {
         try await lockFile.upsert(locked)
         var agents: Set<AgentID> = []
         for agentID in installTo {
-            try await toggleAgent(name: repo, agent: agentID, install: true, home: home)
+            try await toggleAgent(name: skillId, agent: agentID, install: true, home: home)
             agents.insert(agentID)
         }
-        let raw = (try? String(contentsOf: dest.appendingPathComponent("SKILL.md"), encoding: .utf8)) ?? ""
+        let raw =
+            (try? String(contentsOf: dest.appendingPathComponent("SKILL.md"), encoding: .utf8))
+            ?? ""
         let parsed = (try? SKILLMdParser.parse(raw)) ?? .init(metadata: SKILLMetadata(), body: raw)
         return Skill(
-            name: repo,
+            name: skillId,
             path: dest,
             source: .github(owner: owner, repo: repo, ref: ref),
             frontmatter: parsed.metadata,
