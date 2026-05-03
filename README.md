@@ -12,6 +12,10 @@ Native macOS app for managing AI agent skills. Rewrite of [SkillPilot](https://g
 - Editor with frontmatter form, CodeEditor body, live Markdown preview, atomic save
 - FSEvents-triggered auto-rescan
 - Registry browser (skills.sh) with search, leaderboard, HTML+Markdown preview, one-click install
+- Native Settings panel (General / Network / Updates / About) with Keychain-backed proxy password
+- MenuBarExtra mini dashboard with skill count + updates badge
+- Quick Look extension for native SKILL.md preview in Finder
+- i18n (en + zh-Hans)
 - Sparkle 2 auto-update bridge (feed URL pending M7)
 
 ## Requirements
