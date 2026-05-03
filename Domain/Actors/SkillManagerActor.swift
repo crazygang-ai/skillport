@@ -91,10 +91,12 @@ public actor SkillManagerActor {
 
     public func installGitHub(
         owner: String, repo: String, ref: String,
+        skillId: String? = nil,
         home: URL, installTo: Set<AgentID>
     ) async throws -> Skill {
         let skill = try await installer.installGitHub(
             owner: owner, repo: repo, ref: ref,
+            skillId: skillId,
             home: home, installTo: installTo
         )
         _ = try await rescan(home: home)
