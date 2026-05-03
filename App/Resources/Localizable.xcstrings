@@ -1,366 +1,1038 @@
 {
   "sourceLanguage" : "en",
-  "version" : "1.0",
   "strings" : {
+    "%@" : {
+
+    },
     "%lld skill updates available" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "%lld skill updates available" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%lld 个技能有可用更新" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld skill updates available"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个技能有可用更新"
+          }
+        }
       }
     },
     "%lld skills installed" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "%lld skills installed" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已安装 %lld 个技能" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld skills installed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已安装 %lld 个技能"
+          }
+        }
       }
     },
     "About" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "About" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "关于" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关于"
+          }
+        }
       }
     },
     "All Skills" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "All Skills" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "全部技能" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All Skills"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部技能"
+          }
+        }
       }
     },
     "All Time" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "All Time" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "全部" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All Time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部"
+          }
+        }
       }
     },
     "Automatically check for updates" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Automatically check for updates" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自动检查更新" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatically check for updates"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动检查更新"
+          }
+        }
       }
     },
     "Back" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Back" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "返回" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返回"
+          }
+        }
       }
     },
     "Back to Dashboard" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Back to Dashboard" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "返回仪表盘" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back to Dashboard"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返回仪表盘"
+          }
+        }
       }
     },
     "Check for Skill Updates" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Check for Skill Updates" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "检查技能更新" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check for Skill Updates"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查技能更新"
+          }
+        }
       }
     },
     "Check for updates" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Check for updates" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "检查更新" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check for updates"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查更新"
+          }
+        }
       }
     },
     "Check now" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Check now" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "立即检查" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check now"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即检查"
+          }
+        }
       }
     },
     "Copied install command" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Copied install command" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已复制安装命令" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copied install command"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已复制安装命令"
+          }
+        }
       }
     },
     "Dashboard" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Dashboard" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仪表盘" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dashboard"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仪表盘"
+          }
+        }
       }
     },
     "Drop a folder with SKILL.md here to import, or use ⌘N." : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Drop a folder with SKILL.md here to import, or use ⌘N." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "把含 SKILL.md 的文件夹拖到这里导入，或按 ⌘N。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drop a folder with SKILL.md here to import, or use ⌘N."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把含 SKILL.md 的文件夹拖到这里导入，或按 ⌘N。"
+          }
+        }
       }
     },
     "Editor" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Editor" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "编辑器" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editor"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑器"
+          }
+        }
       }
     },
     "Enable proxy" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enable proxy" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "启用代理" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable proxy"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用代理"
+          }
+        }
       }
     },
     "Failed to save password: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Failed to save password: %@" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "密码保存失败：%@" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed to save password: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码保存失败：%@"
+          }
+        }
       }
     },
     "Filter by agent" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Filter by agent" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "按 agent 筛选" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filter by agent"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按 agent 筛选"
+          }
+        }
       }
     },
     "General" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "General" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通用" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "General"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通用"
+          }
+        }
       }
     },
     "GitHub" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "GitHub" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "GitHub" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub"
+          }
+        }
       }
     },
     "Host" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Host" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "主机" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Host"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主机"
+          }
+        }
       }
     },
     "Hot" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hot" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "热门" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hot"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "热门"
+          }
+        }
+      }
+    },
+    "HTTPS" : {
+
+    },
+    "Import failed: %@" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import failed: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入失败：%@"
+          }
+        }
       }
     },
     "Import Skill…" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Import Skill…" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "导入技能…" } }
-      }
-    },
-    "Import failed: %@" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Import failed: %@" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "导入失败：%@" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import Skill…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入技能…"
+          }
+        }
       }
     },
     "Imported %@" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Imported %@" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已导入 %@" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imported %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已导入 %@"
+          }
+        }
       }
     },
     "Install" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Install" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "安装" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Install"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装"
+          }
+        }
       }
     },
     "Install to agents" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Install to agents" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "安装到 agent" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Install to agents"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装到 agent"
+          }
+        }
       }
     },
     "Installed %@" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Installed %@" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已安装 %@" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installed %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已安装 %@"
+          }
+        }
       }
     },
     "Language" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Language" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "语言" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Language"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "语言"
+          }
+        }
       }
     },
     "Language changed — please restart Skillport." : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Language changed — please restart Skillport." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "语言已更改 — 请重启 Skillport。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Language changed — please restart Skillport."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "语言已更改 — 请重启 Skillport。"
+          }
+        }
       }
     },
     "Last checked %@" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Last checked %@" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上次检查：%@" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last checked %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次检查：%@"
+          }
+        }
       }
     },
     "Load failed: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Load failed: %@" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "加载失败：%@" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Load failed: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加载失败：%@"
+          }
+        }
       }
     },
     "Multi-skill repo — use CLI above" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Multi-skill repo — use CLI above" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "多技能仓库 — 请用上方 CLI 命令" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Multi-skill repo — use CLI above"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "多技能仓库 — 请用上方 CLI 命令"
+          }
+        }
       }
     },
     "Network" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Network" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "网络" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网络"
+          }
+        }
       }
     },
     "Never checked for updates" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Never checked for updates" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "尚未检查更新" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Never checked for updates"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未检查更新"
+          }
+        }
       }
     },
     "No results" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "No results" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无结果" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No results"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无结果"
+          }
+        }
       }
     },
     "No skills available" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "No skills available" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无技能" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No skills available"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂无技能"
+          }
+        }
       }
     },
     "No skills yet" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "No skills yet" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "尚无技能" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No skills yet"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚无技能"
+          }
+        }
       }
     },
     "Open Skillport" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Skillport" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开 Skillport" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Skillport"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 Skillport"
+          }
+        }
       }
     },
     "Password (stored in Keychain)" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Password (stored in Keychain)" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "密码（存于 Keychain）" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Password (stored in Keychain)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码（存于 Keychain）"
+          }
+        }
       }
     },
     "Port" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Port" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "端口" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Port"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "端口"
+          }
+        }
       }
     },
     "Proxy password saved" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Proxy password saved" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "代理密码已保存" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proxy password saved"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "代理密码已保存"
+          }
+        }
       }
     },
     "Quit Skillport" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quit Skillport" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "退出 Skillport" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quit Skillport"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出 Skillport"
+          }
+        }
       }
     },
     "Registry" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Registry" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "注册表" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Registry"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "注册表"
+          }
+        }
       }
     },
     "Rescan" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rescan" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重新扫描" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rescan"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新扫描"
+          }
+        }
       }
     },
     "Restart required for language change to take effect." : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Restart required for language change to take effect." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "语言更改需重启 Skillport 才会生效。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restart required for language change to take effect."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "语言更改需重启 Skillport 才会生效。"
+          }
+        }
       }
     },
     "Save" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "保存" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存"
+          }
+        }
       }
     },
     "Save failed: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save failed: %@" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "保存失败：%@" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save failed: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存失败：%@"
+          }
+        }
       }
     },
     "Save password" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save password" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "保存密码" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save password"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存密码"
+          }
+        }
       }
     },
     "Saved." : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saved." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已保存。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已保存。"
+          }
+        }
       }
     },
     "Scanning…" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Scanning…" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "扫描中…" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scanning…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扫描中…"
+          }
+        }
       }
     },
     "Search skills" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Search skills" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "搜索技能" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search skills"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索技能"
+          }
+        }
       }
     },
     "Select a skill to see details" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Select a skill to see details" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择一个技能查看详情" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select a skill to see details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择一个技能查看详情"
+          }
+        }
       }
     },
+    "Skillport" : {
+
+    },
+    "SOCKS5" : {
+
+    },
     "Toggle failed: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Toggle failed: %@" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "切换失败：%@" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toggle failed: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切换失败：%@"
+          }
+        }
       }
     },
     "Trending" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Trending" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "趋势" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trending"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "趋势"
+          }
+        }
       }
     },
     "Type" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Type" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "类型" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "类型"
+          }
+        }
       }
     },
     "Update" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Update" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
+          }
+        }
       }
     },
     "Updates" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Updates" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Updates"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
+          }
+        }
       }
     },
     "Username (optional)" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Username (optional)" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "用户名（可选）" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Username (optional)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户名（可选）"
+          }
+        }
       }
     },
     "Views" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Views" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "视图" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Views"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "视图"
+          }
+        }
       }
     }
-  }
+  },
+  "version" : "1.0"
 }
