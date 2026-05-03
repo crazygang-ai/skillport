@@ -127,6 +127,22 @@ public struct RegistryContentRenderer {
                 acc.append(renderNode(child, indent: indent))
             }
             return acc
+        case let table as Markdown.Table:
+            var acc = AttributedString()
+            let headerLine = table.head.cells.map { $0.plainText }.joined(separator: " | ")
+            var headerText = AttributedString(headerLine)
+            headerText.font = .system(.body, weight: .bold)
+            acc.append(headerText)
+            acc.append(AttributedString("\n"))
+            acc.append(AttributedString(String(repeating: "-", count: 40) + "\n"))
+            for row in table.body.rows {
+                acc.append(
+                    AttributedString(
+                        row.cells.map { $0.plainText }.joined(separator: " | ")))
+                acc.append(AttributedString("\n"))
+            }
+            acc.append(AttributedString("\n"))
+            return acc
         default:
             return AttributedString(node.format())
         }
