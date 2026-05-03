@@ -46,9 +46,10 @@ public final class AppContainer {
         self.registryModel = RegistryModel(
             registry: registryActor,
             contentFetcher: contentFetcher,
-            installHandler: { owner, repo, ref, installTo in
+            installHandler: { owner, repo, ref, skillId, installTo in
                 try await manager.installGitHub(
                     owner: owner, repo: repo, ref: ref,
+                    skillId: skillId,
                     home: home, installTo: installTo)
             }
         )

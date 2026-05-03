@@ -37,7 +37,7 @@ struct RegistryE2ETests {
 
         let registry = RegistryActor(session: MockURLProtocol.makeSession())
         let fetcher = SkillContentFetcher(session: MockURLProtocol.makeSession())
-        let installer: RegistryModel.InstallHandler = { _, _, _, _ in
+        let installer: RegistryModel.InstallHandler = { _, _, _, _, _ in
             throw SkillportError.unexpected("install not exercised in this test")
         }
         let model = RegistryModel(
@@ -78,7 +78,7 @@ struct RegistryE2ETests {
         let model = RegistryModel(
             registry: RegistryActor(session: MockURLProtocol.makeSession()),
             contentFetcher: SkillContentFetcher(session: MockURLProtocol.makeSession()),
-            installHandler: { _, _, _, _ in
+            installHandler: { _, _, _, _, _ in
                 throw SkillportError.unexpected("install not exercised")
             }
         )
@@ -96,14 +96,22 @@ struct RegistryE2ETests {
         }
     }
 
-    @Test("install button disabled for multi-skill repos (ADR-M5-2)")
-    func multiSkillRepoBlocked() async {
+    @Test("install passes skillId through to handler for multi-skill repos")
+    func multiSkillPassesSkillIdThrough() async {
+        let receivedBox = ReceivedBox()
         let model = RegistryModel(
             registry: RegistryActor(session: MockURLProtocol.makeSession()),
             contentFetcher: SkillContentFetcher(session: MockURLProtocol.makeSession()),
-            installHandler: { _, _, _, _ in
-                Issue.record("install should not be called for multi-skill repo")
-                throw SkillportError.unexpected("should not reach")
+            installHandler: { owner, repo, ref, skillId, installTo in
+                await receivedBox.set(skillId: skillId)
+                return Skill(
+                    name: skillId,
+                    path: URL(fileURLWithPath: "/tmp/\(skillId)"),
+                    source: .github(owner: owner, repo: repo, ref: ref),
+                    frontmatter: SKILLMetadata(),
+                    installedAgents: installTo,
+                    updateStatus: .upToDate
+                )
             }
         )
         model.skills = [
@@ -115,13 +123,18 @@ struct RegistryE2ETests {
         model.selectedID = "owner/repo/subsk"
         model.selectedAgentsForInstall = [.claudeCode]
         let result = await model.installSelected()
-        switch result {
-        case .failure:
-            break  // 期望
-        case .success:
-            Issue.record("multi-skill install should have failed")
+        if case .failure(let err) = result {
+            Issue.record("install should succeed; got \(err)")
         }
+        let captured = await receivedBox.skillId
+        #expect(captured == "subsk")
     }
+}
+
+/// Test helper — thread-safe box to capture skillId from @Sendable install handler.
+private actor ReceivedBox {
+    var skillId: String?
+    func set(skillId: String) { self.skillId = skillId }
 }
 
 private func makeFakeRSCPayload(htmlBody: String) -> String {

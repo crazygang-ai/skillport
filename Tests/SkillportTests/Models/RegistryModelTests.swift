@@ -12,7 +12,7 @@ struct RegistryModelTests {
         let registry = RegistryActor(session: session)
         let fetcher = SkillContentFetcher(session: session)
         // Install handler stubbed — tests that exercise install go to T11 E2E.
-        let installer: RegistryModel.InstallHandler = { _, _, _, _ in
+        let installer: RegistryModel.InstallHandler = { _, _, _, _, _ in
             throw SkillportError.unexpected("install not stubbed for this test")
         }
         return RegistryModel(

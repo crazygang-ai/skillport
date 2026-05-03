@@ -8,6 +8,7 @@ public final class RegistryModel {
     public typealias InstallHandler =
         @Sendable (
             _ owner: String, _ repo: String, _ ref: String,
+            _ skillId: String,
             _ installTo: Set<AgentID>
         ) async throws -> Skill
 
@@ -117,16 +118,9 @@ public final class RegistryModel {
         else {
             return .failure(SkillportError.unexpected("no registry selection to install"))
         }
-        guard skill.isSingleSkillRepo else {
-            return .failure(
-                SkillportError.unexpected(
-                    "multi-skill repo install is not supported in M5; use CLI command"
-                )
-            )
-        }
         do {
             let installed = try await installHandler(
-                owner, repo, "HEAD", selectedAgentsForInstall)
+                owner, repo, "HEAD", skill.skillId, selectedAgentsForInstall)
             return .success(installed)
         } catch {
             return .failure(error)
