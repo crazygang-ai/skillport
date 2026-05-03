@@ -75,8 +75,13 @@ public actor RegistryActor {
                 let name: String?
                 let installs: Int
                 let source: String
-                let installs_yesterday: Int?
+                let installsYesterday: Int?
                 let change: Int?
+
+                enum CodingKeys: String, CodingKey {
+                    case id, skillId, name, installs, source, change
+                    case installsYesterday = "installs_yesterday"
+                }
             }
         }
         let decoded: Response
@@ -93,7 +98,7 @@ public actor RegistryActor {
                 name: raw.name ?? skillId,
                 installs: raw.installs,
                 source: raw.source,
-                installsYesterday: raw.installs_yesterday,
+                installsYesterday: raw.installsYesterday,
                 change: raw.change
             )
         }
