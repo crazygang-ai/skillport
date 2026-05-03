@@ -45,4 +45,3 @@ public final class AppUpdaterBridge {
         return url
     }
 }
-
