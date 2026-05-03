@@ -54,9 +54,10 @@ struct SkillportApp: App {
         }
 
         Settings {
-            Text("Settings — 下一里程碑实现")
-                .padding()
-                .frame(minWidth: 400, minHeight: 200)
+            SettingsView()
+                .environment(container.settingsModel)
+                .environment(container.notificationModel)
+                .environment(container.updateModel)
         }
     }
 }
