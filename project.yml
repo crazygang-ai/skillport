@@ -46,6 +46,7 @@ targets:
       - package: swift-markdown
         product: Markdown
       - package: SwiftSoup
+      - target: SkillportPreview
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.crazygang.Skillport
@@ -74,6 +75,26 @@ targets:
         BUNDLE_LOADER: "$(TEST_HOST)"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Skillport.app/Contents/MacOS/Skillport"
         GENERATE_INFOPLIST_FILE: YES
+  SkillportPreview:
+    type: app-extension
+    platform: macOS
+    deploymentTarget: "15.0"
+    sources:
+      - SkillportPreview
+    dependencies:
+      - package: Yams
+      - package: swift-markdown
+        product: Markdown
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.crazygang.Skillport.Preview
+        PRODUCT_NAME: SkillportPreview
+        INFOPLIST_FILE: SkillportPreview/Info.plist
+        CODE_SIGN_ENTITLEMENTS: SkillportPreview/SkillportPreview.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+        MARKETING_VERSION: "0.0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        SKIP_INSTALL: YES
 schemes:
   Skillport:
     build:
