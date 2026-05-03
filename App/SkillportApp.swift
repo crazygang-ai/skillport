@@ -23,7 +23,7 @@ struct SkillportApp: App {
         .windowResizability(.contentSize)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("Import Skill…") {
+                Button(String(localized: "Import Skill…")) {
                     guard let url = ImportCommand.pickFolder() else { return }
                     Task {
                         do {
@@ -32,23 +32,26 @@ struct SkillportApp: App {
                             container.notificationModel.post(
                                 .init(
                                     level: .success,
-                                    message: "Imported \(url.lastPathComponent)"))
+                                    message: String(
+                                        localized: "Imported \(url.lastPathComponent)")))
                         } catch {
                             container.notificationModel.post(
                                 .init(
                                     level: .error,
-                                    message: "Import failed: \(error)"))
+                                    message: String(
+                                        localized:
+                                            "Import failed: \(error.localizedDescription)")))
                         }
                     }
                 }
                 .keyboardShortcut("n", modifiers: .command)
             }
             CommandGroup(after: .appSettings) {
-                Button("Rescan") {
+                Button(String(localized: "Rescan")) {
                     Task { try? await container.skillsModel.refresh() }
                 }
                 .keyboardShortcut("r", modifiers: .command)
-                Button("Check for Skill Updates") {}  // 接在后续 milestone
+                Button(String(localized: "Check for Skill Updates")) {}
                     .keyboardShortcut("u", modifiers: .command)
             }
         }

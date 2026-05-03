@@ -25,27 +25,31 @@ struct SkillEditorView: View {
             MarkdownPreview(source: source)
                 .frame(minWidth: 320)
         }
-        .navigationTitle(state.filePath?.lastPathComponent ?? "Editor")
+        .navigationTitle(state.filePath?.lastPathComponent ?? String(localized: "Editor"))
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button {
                     app.setSection(.dashboard)
                 } label: {
-                    Label("Back", systemImage: "chevron.left")
+                    Label(String(localized: "Back"), systemImage: "chevron.left")
                 }
-                .help("Back to Dashboard")
+                .help(String(localized: "Back to Dashboard"))
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     do {
                         try state.save()
-                        notifications.post(.init(level: .success, message: "Saved."))
+                        notifications.post(
+                            .init(level: .success, message: String(localized: "Saved.")))
                     } catch {
                         notifications.post(
-                            .init(level: .error, message: "Save failed: \(error)"))
+                            .init(
+                                level: .error,
+                                message: String(
+                                    localized: "Save failed: \(error.localizedDescription)")))
                     }
                 } label: {
-                    Label("Save", systemImage: "square.and.arrow.down")
+                    Label(String(localized: "Save"), systemImage: "square.and.arrow.down")
                 }
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled(!state.isDirty)

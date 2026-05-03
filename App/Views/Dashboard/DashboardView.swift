@@ -11,12 +11,14 @@ struct DashboardView: View {
         let list = skillsModel.skillsFiltered(by: app.currentAgentFilter)
         VStack {
             if skillsModel.isScanning {
-                ProgressView("Scanning…")
+                ProgressView(String(localized: "Scanning…"))
             } else if list.isEmpty {
                 ContentUnavailableView(
-                    "No skills yet",
+                    String(localized: "No skills yet"),
                     systemImage: "sparkles",
-                    description: Text("Drop a folder with SKILL.md here to import, or use ⌘N.")
+                    description: Text(
+                        String(
+                            localized: "Drop a folder with SKILL.md here to import, or use ⌘N."))
                 )
             } else {
                 List(list) { skill in
@@ -44,7 +46,9 @@ struct DashboardView: View {
                 .listStyle(.inset)
             }
         }
-        .navigationTitle(app.currentAgentFilter?.displayName ?? "All Skills")
+        .navigationTitle(
+            app.currentAgentFilter?.displayName ?? String(localized: "All Skills")
+        )
         .overlay {
             if isDropTargeted {
                 RoundedRectangle(cornerRadius: 12)

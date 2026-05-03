@@ -12,21 +12,21 @@ struct SidebarView: View {
                 set: { app.selectAgent($0) }
             )
         ) {
-            Section("Views") {
+            Section(String(localized: "Views")) {
                 Button {
                     app.setSection(.dashboard)
                 } label: {
-                    Label("Dashboard", systemImage: "square.grid.2x2")
+                    Label(String(localized: "Dashboard"), systemImage: "square.grid.2x2")
                 }
                 Button {
                     app.setSection(.registry)
                 } label: {
-                    Label("Registry", systemImage: "books.vertical")
+                    Label(String(localized: "Registry"), systemImage: "books.vertical")
                 }
             }
             .buttonStyle(.plain)
 
-            Section("Filter by agent") {
+            Section(String(localized: "Filter by agent")) {
                 ForEach(skillsModel.agents, id: \.id) { agent in
                     NavigationLink(value: agent.id) {
                         HStack {
