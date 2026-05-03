@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+
+      - name: Bootstrap
+        run: ./Scripts/bootstrap.sh
+
+      - name: Import Developer ID certificate
+        env:
+          DEV_ID_CERT_BASE64: ${{ secrets.DEV_ID_CERT_BASE64 }}
+          DEV_ID_CERT_PASSWORD: ${{ secrets.DEV_ID_CERT_PASSWORD }}
+        run: |
+          if [ -z "$DEV_ID_CERT_BASE64" ]; then
+              echo "⚠️  DEV_ID_CERT_BASE64 not set — skipping cert import; codesign will fail"
+              exit 0
+          fi
+          echo "$DEV_ID_CERT_BASE64" | base64 --decode > cert.p12
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import cert.p12 -k build.keychain -P "$DEV_ID_CERT_PASSWORD" \
+              -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+          rm -f cert.p12
+
+      - name: Generate project
+        run: ./Scripts/generate-project.sh
+
+      - name: Check parser parity
+        run: ./Scripts/check-parser-parity.sh
+
+      - name: Archive
+        env:
+          DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
+        run: |
+          xcodebuild archive \
+            -scheme Skillport \
+            -destination 'generic/platform=macOS' \
+            -archivePath build/Skillport.xcarchive \
+            -configuration Release \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM"
+
+      - name: Export .app
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath build/Skillport.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist build/ExportOptions.plist
+
+      - name: Notarize
+        env:
+          AC_USERNAME: ${{ secrets.AC_USERNAME }}
+          AC_TEAM_ID: ${{ secrets.AC_TEAM_ID }}
+          AC_APP_SPECIFIC_PASSWORD: ${{ secrets.AC_APP_SPECIFIC_PASSWORD }}
+        run: ./Scripts/notarize.sh build/export/Skillport.app
+
+      - name: Write Sparkle private key
+        env:
+          SPARKLE_PRIVATE_KEY_BASE64: ${{ secrets.SPARKLE_PRIVATE_KEY_BASE64 }}
+        run: |
+          if [ -z "$SPARKLE_PRIVATE_KEY_BASE64" ]; then
+              echo "❌ SPARKLE_PRIVATE_KEY_BASE64 not set"
+              exit 1
+          fi
+          echo "$SPARKLE_PRIVATE_KEY_BASE64" | base64 --decode > build/sparkle_priv.key
+          echo "SPARKLE_PRIVATE_KEY_PATH=$(pwd)/build/sparkle_priv.key" >> "$GITHUB_ENV"
+
+      - name: Package + sign appcast
+        env:
+          APPCAST_DMG_BASE_URL: ${{ secrets.APPCAST_DMG_BASE_URL }}
+        run: ./Scripts/publish-appcast.sh build/export ${GITHUB_REF_NAME#v}
+
+      - name: Clean up Sparkle key
+        if: always()
+        run: rm -f build/sparkle_priv.key
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/export/Skillport-*.dmg
+            build/export/appcast.xml
+          draft: false
+          prerelease: false
