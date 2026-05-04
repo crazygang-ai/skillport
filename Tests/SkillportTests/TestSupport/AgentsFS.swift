@@ -38,4 +38,27 @@ enum AgentsFS {
         let link = linkDir.appendingPathComponent(skillName)
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: canonical)
     }
+
+    /// 直接把一个完整 SKILL.md skill 写进某 agent 的 skills 目录（不走 canonical）。
+    /// 模拟 `claude skill install` 把 skill 落地到 .claude/skills 的情形。
+    @discardableResult
+    static func createForeignSkill(
+        in home: URL,
+        agentRelativeSkillsDir: String,
+        name: String,
+        description: String = "foreign"
+    ) throws -> URL {
+        let skillDir =
+            home
+            .appendingPathComponent(agentRelativeSkillsDir, isDirectory: true)
+            .appendingPathComponent(name, isDirectory: true)
+        try FileManager.default.createDirectory(at: skillDir, withIntermediateDirectories: true)
+        let raw = try SKILLMdParser.serialize(
+            metadata: SKILLMetadata(description: description),
+            body: "# \(name)\n"
+        )
+        try raw.write(
+            to: skillDir.appendingPathComponent("SKILL.md"), atomically: true, encoding: .utf8)
+        return skillDir
+    }
 }

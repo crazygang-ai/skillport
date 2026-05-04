@@ -3,9 +3,6 @@ import Foundation
 /// Stable identity for a skill: encodes source + name so two installs of the same
 /// upstream skill (different names) are distinguishable, and two installs from
 /// different sources with the same name don't collide.
-///
-/// Swift-native format (plain-text, human-readable). Not wire-compatible with
-/// the Electron version's hash-based `skill_<sha256hex>` IDs; see plan notes.
 public struct SkillIdentity: Codable, Hashable, Sendable {
     public let rawValue: String
 

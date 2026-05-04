@@ -5,13 +5,26 @@ struct RootView: View {
     @Environment(SkillsModel.self) private var skillsModel
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: sidebarVisibility) {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220)
         } detail: {
             DetailArea()
         }
+        .navigationSplitViewStyle(.balanced)
         .overlay { NotificationHost() }
+    }
+
+    /// Editor 模式下隐藏侧边栏 —— 编辑 SKILL.md 时用户不需要看到 Dashboard/Registry/agent
+    /// 列表，让中间表单 + 右侧预览占满窗口。其它模式保留双列布局。
+    private var sidebarVisibility: Binding<NavigationSplitViewVisibility> {
+        Binding(
+            get: {
+                if case .editor = appModel.section { return .detailOnly }
+                return .automatic
+            },
+            set: { _ in }
+        )
     }
 }
 

@@ -41,7 +41,16 @@ public actor SkillManagerActor {
         let scanned = try await scanner.scanAll(home: home)
         // Scanner 默认把 source 设为 .local；lockfile 里持有真实 source。
         // 合并后避免 installGitHub 之后 rescan 把 source 错误回退为 .local。
-        let lock = (try? await lockFile.read()) ?? LockFile(skills: [])
+        let lock: LockFile
+        do {
+            lock = try await lockFile.read()
+        } catch {
+            let reason = (error as? SkillportError).map { "\($0)" } ?? "\(error)"
+            eventsContinuation.yield(
+                .error(.invalidLockFile(reason: reason))
+            )
+            lock = LockFile(skills: [])
+        }
         let sourceByName: [String: SkillSource] = Dictionary(
             uniqueKeysWithValues: lock.skills.map { ($0.name, $0.source) }
         )
@@ -61,12 +70,34 @@ public actor SkillManagerActor {
     }
 
     public func startWatching(home: URL) async {
+        let fm = FileManager.default
         let canonicalBase = home.appendingPathComponent(".agents/skills", isDirectory: true)
-        try? FileManager.default.createDirectory(at: canonicalBase, withIntermediateDirectories: true)
-        let stream = await watcher.start(paths: [canonicalBase])
+        try? fm.createDirectory(at: canonicalBase, withIntermediateDirectories: true)
+
+        // 同时监听每个 agent 的 skillsDir（外部 CLI 直接往 `.claude/skills` 写 skill
+        // 也能触发 rescan）。只收录已存在的目录，FSEvents 对不存在的 path 会忽略但
+        // 也会产生噪声。
+        var paths: [URL] = [canonicalBase]
+        for agent in Agent.defaultAgents(home: home) {
+            if fm.fileExists(atPath: agent.skillsDir.path) {
+                paths.append(agent.skillsDir)
+            }
+        }
+
+        let stream = await watcher.start(paths: paths)
         watchTask = Task { [weak self] in
+            // 100ms debounce — 合并 FSEvents 的洪峰（git 操作、批量安装等）。
+            let debounce: Duration = .milliseconds(100)
+            var pending = false
+            var lastFire: ContinuousClock.Instant? = nil
             for await _ in stream {
-                try? await self?.rescan(home: home)
+                let now = ContinuousClock.now
+                if let last = lastFire, now - last < debounce, pending { continue }
+                pending = true
+                try? await Task.sleep(for: debounce)
+                lastFire = ContinuousClock.now
+                pending = false
+                _ = try? await self?.rescan(home: home)
             }
         }
     }
@@ -116,5 +147,59 @@ public actor SkillManagerActor {
         }.count
         eventsContinuation.yield(.batchUpdateCheckCompleted(available: available))
         return results
+    }
+
+    /// Apply a pending update: atomic swap on canonical, refresh lockfile baseline.
+    public func applyUpdate(name: String, home: URL) async throws {
+        let lock = try await lockFile.read()
+        guard let locked = lock.skills.first(where: { $0.name == name }) else {
+            throw SkillportError.unexpected("no lockfile entry for '\(name)'")
+        }
+        let newHash = try await updater.apply(
+            name: name,
+            source: locked.source,
+            canonical: locked.path,
+            skillPath: locked.skillPath
+        )
+        let updated = LockedSkill(
+            name: locked.name,
+            source: locked.source,
+            installedAt: locked.installedAt,
+            commitHash: locked.commitHash,
+            path: locked.path,
+            skillFolderHash: newHash,
+            skillPath: locked.skillPath,
+            updatedAt: Date(),
+            dismissedUpdate: nil,
+            lastSelectedAgents: locked.lastSelectedAgents
+        )
+        try await lockFile.upsert(updated)
+        let id = SkillIdentity.compute(name: name, source: locked.source)
+        eventsContinuation.yield(.skillUpdateStatusChanged(id: id, status: .upToDate))
+        _ = try await rescan(home: home)
+    }
+
+    /// Record that the user dismissed an available update for this skill.
+    /// Next `checkStatus` will return `.upToDate` as long as the remote hash stays the same.
+    public func dismissUpdate(name: String, remoteHash: String) async throws {
+        let lock = try await lockFile.read()
+        guard let locked = lock.skills.first(where: { $0.name == name }) else {
+            throw SkillportError.unexpected("no lockfile entry for '\(name)'")
+        }
+        let updated = LockedSkill(
+            name: locked.name,
+            source: locked.source,
+            installedAt: locked.installedAt,
+            commitHash: locked.commitHash,
+            path: locked.path,
+            skillFolderHash: locked.skillFolderHash,
+            skillPath: locked.skillPath,
+            updatedAt: locked.updatedAt,
+            dismissedUpdate: remoteHash,
+            lastSelectedAgents: locked.lastSelectedAgents
+        )
+        try await lockFile.upsert(updated)
+        let id = SkillIdentity.compute(name: name, source: locked.source)
+        eventsContinuation.yield(.skillUpdateStatusChanged(id: id, status: .upToDate))
     }
 }

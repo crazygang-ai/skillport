@@ -31,19 +31,19 @@ struct DashboardFlowTests {
         let skill = container.skillsModel.skills[0]
         #expect(skill.installedAgents.contains(.claudeCode))
 
-        // 切换 agent：开 cursor、关 claudeCode
+        // 切换 agent：开 kiro（无 fallback → 必建 symlink）、关 claudeCode
         try await container.skillsModel.toggle(
-            skillName: "my-skill", agent: .cursor, install: true)
+            skillName: "my-skill", agent: .kiro, install: true)
         try await container.skillsModel.toggle(
             skillName: "my-skill", agent: .claudeCode, install: false)
         try await container.skillsModel.refresh()
         let after = container.skillsModel.skills.first!
-        #expect(after.installedAgents.contains(.cursor))
+        #expect(after.installedAgents.contains(.kiro))
         #expect(!after.installedAgents.contains(.claudeCode))
 
-        // 磁盘验证
-        let cursorLink = dir.url.appendingPathComponent(".cursor/skills/my-skill")
-        #expect(FileManager.default.fileExists(atPath: cursorLink.path))
+        // 磁盘验证：kiro 没 fallback，一定建了 symlink
+        let kiroLink = dir.url.appendingPathComponent(".kiro/skills/my-skill")
+        #expect(FileManager.default.fileExists(atPath: kiroLink.path))
         let claudeLink = dir.url.appendingPathComponent(".claude/skills/my-skill")
         #expect(!FileManager.default.fileExists(atPath: claudeLink.path))
 

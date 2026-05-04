@@ -14,10 +14,14 @@ public actor LockFileActor {
         let data = try Data(contentsOf: path)
         do {
             return try LockFile.decode(from: data)
-        } catch let LockFile.DecodingError.unsupportedVersion(v) {
-            throw SkillportError.invalidLockFile(reason: "unsupported version \(v)")
         } catch {
-            throw SkillportError.invalidLockFile(reason: "\(error)")
+            // 坏文件或不认识的 schema —— 把它挪到旁边 `.bak-<timestamp>` 备份，
+            // 返回空 lockfile 让 UI 继续跑；下次 upsert 会写一份干净的。
+            let stamp = ISO8601DateFormatter().string(from: Date())
+                .replacingOccurrences(of: ":", with: "-")
+            let backup = path.appendingPathExtension("bak-\(stamp)")
+            try? FileManager.default.moveItem(at: path, to: backup)
+            return LockFile(version: LockFile.currentVersion, skills: [])
         }
     }
 

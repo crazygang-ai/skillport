@@ -72,4 +72,62 @@ struct GitActorTests {
             _ = try await git.headHash(in: notRepo)
         }
     }
+
+    @Test("clone with ref=HEAD does not pass -b HEAD to git")
+    func cloneHeadRefFallsBackToDefault() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let source = try makeRepo(in: dir)
+        let dest = dir.url.appendingPathComponent("cloned-head")
+        let git = GitActor()
+        // 正常 `git clone --branch HEAD` 会报 "Remote branch HEAD not found"。
+        // 修复后 ref=="HEAD" 时不拼 -b，clone 默认分支应当成功。
+        try await git.clone(url: source, to: dest, ref: "HEAD", depth: 1)
+        #expect(
+            FileManager.default.fileExists(
+                atPath: dest.appendingPathComponent("README.md").path))
+    }
+
+    @Test("subdirTreeHash returns subdir hash that changes when subdir content changes")
+    func subdirTreeHashTracksSubdir() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let repo = try dir.mkdir("repo")
+        _ = try runGit(["init", "-b", "main"], cwd: repo)
+        _ = try runGit(["config", "user.email", "t@t"], cwd: repo)
+        _ = try runGit(["config", "user.name", "t"], cwd: repo)
+        let subA = repo.appendingPathComponent("skills/alpha")
+        let subB = repo.appendingPathComponent("skills/beta")
+        try FileManager.default.createDirectory(at: subA, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: subB, withIntermediateDirectories: true)
+        try "a1".write(to: subA.appendingPathComponent("SKILL.md"), atomically: true, encoding: .utf8)
+        try "b1".write(to: subB.appendingPathComponent("SKILL.md"), atomically: true, encoding: .utf8)
+        _ = try runGit(["add", "."], cwd: repo)
+        _ = try runGit(["commit", "-m", "init"], cwd: repo)
+
+        let git = GitActor()
+        let hashA1 = try await git.subdirTreeHash(in: repo, subdir: "skills/alpha")
+        let hashB1 = try await git.subdirTreeHash(in: repo, subdir: "skills/beta")
+        #expect(hashA1 != hashB1)
+
+        // Change only alpha; beta's tree hash must remain stable.
+        try "a2".write(to: subA.appendingPathComponent("SKILL.md"), atomically: true, encoding: .utf8)
+        _ = try runGit(["add", "."], cwd: repo)
+        _ = try runGit(["commit", "-m", "update alpha"], cwd: repo)
+        let hashA2 = try await git.subdirTreeHash(in: repo, subdir: "skills/alpha")
+        let hashB2 = try await git.subdirTreeHash(in: repo, subdir: "skills/beta")
+        #expect(hashA1 != hashA2)
+        #expect(hashB1 == hashB2)
+    }
+
+    @Test("subdirTreeHash with empty subdir falls back to full tree hash")
+    func subdirTreeHashEmptyFallsBack() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let repo = try makeRepo(in: dir)
+        let git = GitActor()
+        let sub = try await git.subdirTreeHash(in: repo, subdir: "")
+        let tree = try await git.treeHash(in: repo, ref: "HEAD")
+        #expect(sub == tree)
+    }
 }

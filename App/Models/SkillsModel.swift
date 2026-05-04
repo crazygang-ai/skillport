@@ -9,12 +9,21 @@ public final class SkillsModel {
     public private(set) var isScanning: Bool = false
 
     private let manager: SkillManagerActor
+    private let detector: AgentDetector
     private let home: URL
+    private weak var notifications: NotificationModel?
     nonisolated(unsafe) private var subscription: Task<Void, Never>?
 
-    public init(manager: SkillManagerActor, home: URL = URL(fileURLWithPath: NSHomeDirectory())) {
+    public init(
+        manager: SkillManagerActor,
+        home: URL = URL(fileURLWithPath: NSHomeDirectory()),
+        detector: AgentDetector = AgentDetector(),
+        notifications: NotificationModel? = nil
+    ) {
         self.manager = manager
         self.home = home
+        self.detector = detector
+        self.notifications = notifications
         self.agents = Agent.defaultAgents(home: home)
         subscribe()
     }
@@ -31,6 +40,8 @@ public final class SkillsModel {
                 switch event {
                 case .skillsReloaded(let list):
                     self.skills = list
+                case .error(let err):
+                    self.notifications?.post(.init(level: .error, message: Self.message(for: err)))
                 default:
                     continue
                 }
@@ -38,11 +49,56 @@ public final class SkillsModel {
         }
     }
 
+    private static func message(for error: SkillportError) -> String {
+        switch error {
+        case .invalidLockFile(let reason):
+            return String(localized: "Lockfile invalid: \(reason). Continuing without it.")
+        case .fileIO(let path, let reason):
+            return String(localized: "I/O error at \(path.lastPathComponent): \(reason)")
+        case .gitFailed(_, let stderr):
+            return String(localized: "git failed: \(stderr)")
+        case .networkFailed(_, let reason):
+            return String(localized: "Network error: \(reason)")
+        case .parseFailed(_, let reason):
+            return String(localized: "Parse failed: \(reason)")
+        case .keychainFailed(let status):
+            return String(localized: "Keychain error: \(status)")
+        case .unexpected(let s):
+            return s
+        }
+    }
+
     public func refresh() async throws {
         isScanning = true
         defer { isScanning = false }
+        async let detected = try? detector.detectAllStatuses(home: home)
         let list = try await manager.rescan(home: home)
         skills = list
+        if let map = await detected {
+            agents = Agent.defaultAgents(home: home).map { a in
+                Agent(
+                    id: a.id,
+                    skillsDir: a.skillsDir,
+                    fallbackChain: a.fallbackChain,
+                    configDir: a.configDir,
+                    status: map[a.id] ?? .uninstalled
+                )
+            }
+        }
+    }
+
+    /// Re-probe which agent CLIs are on PATH without rescanning the filesystem.
+    public func refreshAgents() async {
+        guard let map = try? await detector.detectAllStatuses(home: home) else { return }
+        agents = Agent.defaultAgents(home: home).map { a in
+            Agent(
+                id: a.id,
+                skillsDir: a.skillsDir,
+                fallbackChain: a.fallbackChain,
+                configDir: a.configDir,
+                status: map[a.id] ?? .uninstalled
+            )
+        }
     }
 
     public func startWatching() async {

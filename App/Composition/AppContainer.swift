@@ -12,19 +12,24 @@ public final class AppContainer {
     public let manager: SkillManagerActor
     public let registryActor: RegistryActor
     public let contentFetcher: SkillContentFetcher
+    public let repoCache: RepoCacheActor
 
     public init(home: URL = URL(fileURLWithPath: NSHomeDirectory())) {
         self.home = home
         let lockPath = home.appendingPathComponent(".agents/.skill-lock.json")
-        let cachePath = home.appendingPathComponent(".agents/.skillpilot-cache.json")
+        let cachePath = home.appendingPathComponent(".agents/.skillport-cache.json")
         let cache = CommitHashCache(path: cachePath)
         let git = GitActor()
         let symlinker = SymlinkManagerActor()
         let lockFile = LockFileActor(path: lockPath)
+        let repoCache = RepoCacheActor(git: git)
+        self.repoCache = repoCache
         let installer = SkillInstallerActor(
-            git: git, symlinker: symlinker, lockFile: lockFile, cache: cache
+            git: git, symlinker: symlinker, lockFile: lockFile, cache: cache, repoCache: repoCache
         )
-        let updater = SkillUpdaterActor(git: git, cache: cache)
+        let updater = SkillUpdaterActor(
+            git: git, cache: cache, repoCache: repoCache, lockFile: lockFile
+        )
         let batchChecker = BatchUpdateCheckerActor(updater: updater)
         let watcher = FileWatcherActor()
         let manager = SkillManagerActor(
@@ -55,9 +60,16 @@ public final class AppContainer {
         )
 
         self.appModel = AppModel()
-        self.skillsModel = SkillsModel(manager: manager, home: home)
         self.notificationModel = NotificationModel()
+        self.skillsModel = SkillsModel(
+            manager: manager, home: home, notifications: self.notificationModel
+        )
         self.settingsModel = SettingsModel(proxyActor: ProxySettingsActor())
         self.updateModel = UpdateModel(bridge: AppUpdaterBridge())
+    }
+
+    /// Clean up shared `/tmp` repo cache on shutdown.
+    public func shutdown() async {
+        await repoCache.cleanupAll()
     }
 }

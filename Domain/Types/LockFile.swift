@@ -45,19 +45,39 @@ public struct LockedSkill: Equatable, Sendable {
     public let installedAt: Date
     public let commitHash: String?
     public let path: URL
+    /// subdir tree hash (git rev-parse HEAD:<skillPath>) — baseline for update detection.
+    public let skillFolderHash: String?
+    /// 相对 repo 根的子目录路径；单 skill 仓库时为 nil 或 ""。
+    public let skillPath: String?
+    /// 最近一次更新落地的时间。
+    public let updatedAt: Date?
+    /// 用户 dismiss 的 remote tree hash；相等时 checkStatus 返回 upToDate。
+    public let dismissedUpdate: String?
+    /// 用户上次在安装对话框选中的 agent 集合；用于恢复 UX 状态。
+    public let lastSelectedAgents: Set<AgentID>?
 
     public init(
         name: String,
         source: SkillSource,
         installedAt: Date,
         commitHash: String?,
-        path: URL
+        path: URL,
+        skillFolderHash: String? = nil,
+        skillPath: String? = nil,
+        updatedAt: Date? = nil,
+        dismissedUpdate: String? = nil,
+        lastSelectedAgents: Set<AgentID>? = nil
     ) {
         self.name = name
         self.source = source
         self.installedAt = installedAt
         self.commitHash = commitHash
         self.path = path
+        self.skillFolderHash = skillFolderHash
+        self.skillPath = skillPath
+        self.updatedAt = updatedAt
+        self.dismissedUpdate = dismissedUpdate
+        self.lastSelectedAgents = lastSelectedAgents
     }
 
     fileprivate init(wire: WireLockedSkill) throws {
@@ -66,6 +86,11 @@ public struct LockedSkill: Equatable, Sendable {
         self.installedAt = wire.installedAt
         self.commitHash = wire.commitHash
         self.path = URL(fileURLWithPath: wire.path)
+        self.skillFolderHash = wire.skillFolderHash
+        self.skillPath = wire.skillPath
+        self.updatedAt = wire.updatedAt
+        self.dismissedUpdate = wire.dismissedUpdate
+        self.lastSelectedAgents = wire.lastSelectedAgents.map { Set($0) }
     }
 }
 
@@ -82,6 +107,11 @@ private struct WireLockedSkill: Codable {
     let installedAt: Date
     let commitHash: String?
     let path: String
+    let skillFolderHash: String?
+    let skillPath: String?
+    let updatedAt: Date?
+    let dismissedUpdate: String?
+    let lastSelectedAgents: [AgentID]?
 
     init(skill: LockedSkill) {
         self.name = skill.name
@@ -89,6 +119,11 @@ private struct WireLockedSkill: Codable {
         self.installedAt = skill.installedAt
         self.commitHash = skill.commitHash
         self.path = skill.path.path
+        self.skillFolderHash = skill.skillFolderHash
+        self.skillPath = skill.skillPath
+        self.updatedAt = skill.updatedAt
+        self.dismissedUpdate = skill.dismissedUpdate
+        self.lastSelectedAgents = skill.lastSelectedAgents.map { Array($0).sorted { $0.rawValue < $1.rawValue } }
     }
 }
 

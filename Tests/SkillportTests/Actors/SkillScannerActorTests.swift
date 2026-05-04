@@ -46,4 +46,44 @@ struct SkillScannerActorTests {
         let skills = try await scanner.scanAll(home: dir.url)
         #expect(skills.isEmpty)
     }
+
+    @Test("Inherited fallback: codex sees .agents/skills entries without symlink")
+    func inheritedFallback() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        // Skill exists only in canonical .agents/skills; no symlink under .codex/skills.
+        try AgentsFS.createCanonicalSkill(in: dir.url, name: "shared")
+
+        let scanner = SkillScannerActor()
+        let skills = try await scanner.scanAll(home: dir.url)
+        #expect(skills.count == 1)
+        let s = skills[0]
+        // codex / gemini / cursor / opencode / copilot 都应通过 fallback 继承到
+        #expect(s.installedAgents.contains(.codex))
+        #expect(s.installedAgents.contains(.gemini))
+        #expect(s.installedAgents.contains(.cursor))
+        #expect(s.installedAgents.contains(.opencode))
+        // claudeCode 没有 fallback，不应继承
+        #expect(!s.installedAgents.contains(.claudeCode))
+        // kiro 也没 fallback
+        #expect(!s.installedAgents.contains(.kiro))
+    }
+
+    @Test("Picks up foreign skill that lives only in an agent dir")
+    func foreignSkillInAgentDir() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        // Skill only in .claude/skills/foo — no canonical copy.
+        try AgentsFS.createForeignSkill(
+            in: dir.url, agentRelativeSkillsDir: ".claude/skills", name: "foo")
+
+        let scanner = SkillScannerActor()
+        let skills = try await scanner.scanAll(home: dir.url)
+        #expect(skills.count == 1)
+        let foo = skills[0]
+        #expect(foo.name == "foo")
+        #expect(foo.installedAgents.contains(.claudeCode))
+        // copilot 的 fallback 链包含 .claude/skills，应被继承识别
+        #expect(foo.installedAgents.contains(.copilot))
+    }
 }

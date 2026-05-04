@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 public actor KeychainActor {
-    public static let defaultService = "skillpilot-proxy"  // 与 Electron 版共享
+    public static let defaultService = "skillport-proxy"
 
     private let service: String
 

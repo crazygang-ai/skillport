@@ -51,8 +51,34 @@ struct SkillportApp: App {
                     Task { try? await container.skillsModel.refresh() }
                 }
                 .keyboardShortcut("r", modifiers: .command)
-                Button(String(localized: "Check for Skill Updates")) {}
-                    .keyboardShortcut("u", modifiers: .command)
+                Button(String(localized: "Check for Skill Updates")) {
+                    Task {
+                        do {
+                            let results = try await container.manager.checkAllUpdates(
+                                skills: container.skillsModel.skills
+                            )
+                            let available = results.values.filter {
+                                if case .available = $0 { return true }
+                                return false
+                            }.count
+                            let level: NotificationLevel = available > 0 ? .info : .success
+                            let msg =
+                                available > 0
+                                ? String(localized: "\(available) skill updates available")
+                                : String(localized: "All skills are up to date")
+                            container.notificationModel.post(.init(level: level, message: msg))
+                        } catch {
+                            container.notificationModel.post(
+                                .init(
+                                    level: .error,
+                                    message: String(
+                                        localized:
+                                            "Update check failed: \(error.localizedDescription)")
+                                ))
+                        }
+                    }
+                }
+                .keyboardShortcut("u", modifiers: .command)
             }
         }
 

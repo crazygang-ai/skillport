@@ -5,13 +5,19 @@ struct SkillRow: View {
     let onToggle: (AgentID, Bool) -> Void
     let onOpen: () -> Void
 
+    @Environment(SkillsModel.self) private var skillsModel
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(skill.name).font(.headline)
                     if let d = skill.frontmatter.description {
-                        Text(d).font(.subheadline).foregroundStyle(.secondary)
+                        Text(d)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .truncationMode(.tail)
                     }
                 }
                 Spacer()
@@ -21,7 +27,11 @@ struct SkillRow: View {
                 .buttonStyle(.borderless)
                 .help("Edit SKILL.md")
             }
-            AgentsRow(skill: skill, onToggle: onToggle)
+            AgentsRow(
+                skill: skill,
+                installedAgentIDs: skillsModel.agents.filter(\.isInstalled).map(\.id),
+                onToggle: onToggle
+            )
         }
         .padding(.vertical, 6)
     }
@@ -29,11 +39,12 @@ struct SkillRow: View {
 
 private struct AgentsRow: View {
     let skill: Skill
+    let installedAgentIDs: [AgentID]
     let onToggle: (AgentID, Bool) -> Void
 
     var body: some View {
         HStack(spacing: 6) {
-            ForEach(AgentID.allCases, id: \.self) { id in
+            ForEach(installedAgentIDs, id: \.self) { id in
                 AgentChip(
                     agent: id,
                     installed: skill.installedAgents.contains(id),

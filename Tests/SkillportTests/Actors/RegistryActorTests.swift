@@ -87,7 +87,7 @@ struct RegistryActorTests {
         #expect(skills[1].change == 2)
     }
 
-    @Test("search clamps limit to upper bound of 100")
+    @Test("search clamps limit to upper bound of 500")
     func searchLimitClamp() async throws {
         MockURLProtocol.resetSync()
         MockURLProtocol.stub(
@@ -96,9 +96,9 @@ struct RegistryActorTests {
             body: Data(#"{"skills":[]}"#.utf8)
         )
         let actor = RegistryActor(session: MockURLProtocol.makeSession())
-        _ = try await actor.search(query: "x", limit: 999)
+        _ = try await actor.search(query: "x", limit: 9999)
         let q = MockURLProtocol.requestLog.last?.url?.query ?? ""
-        #expect(q.contains("limit=100"))
+        #expect(q.contains("limit=500"))
     }
 
     // MARK: - Helper

@@ -21,7 +21,7 @@ struct SkillInstallerActorTests {
             git: GitActor(),
             symlinker: SymlinkManagerActor(),
             lockFile: LockFileActor(path: lockPath),
-            cache: CommitHashCache(path: home.appendingPathComponent(".agents/.skillpilot-cache.json"))
+            cache: CommitHashCache(path: home.appendingPathComponent(".agents/.skillport-cache.json"))
         )
         let skill = try await installer.installLocal(from: src, home: home, installTo: [.claudeCode])
         #expect(skill.name == "localSkill")
@@ -52,7 +52,7 @@ struct SkillInstallerActorTests {
             git: GitActor(),
             symlinker: SymlinkManagerActor(),
             lockFile: LockFileActor(path: lockPath),
-            cache: CommitHashCache(path: home.appendingPathComponent(".agents/.skillpilot-cache.json"))
+            cache: CommitHashCache(path: home.appendingPathComponent(".agents/.skillport-cache.json"))
         )
         _ = try await installer.installLocal(from: src, home: home, installTo: [.kiro])
         try await installer.uninstall(name: "s", home: home)
@@ -78,13 +78,14 @@ struct SkillInstallerActorTests {
             git: GitActor(),
             symlinker: SymlinkManagerActor(),
             lockFile: LockFileActor(path: home.appendingPathComponent(".agents/.skill-lock.json")),
-            cache: CommitHashCache(path: home.appendingPathComponent(".agents/.skillpilot-cache.json"))
+            cache: CommitHashCache(path: home.appendingPathComponent(".agents/.skillport-cache.json"))
         )
         _ = try await installer.installLocal(from: src, home: home, installTo: [])
-        try await installer.toggleAgent(name: "t", agent: .cursor, install: true, home: home)
-        let link = home.appendingPathComponent(".cursor/skills/t")
+        // Use .kiro — no fallback chain, so toggleAgent must create an actual symlink.
+        try await installer.toggleAgent(name: "t", agent: .kiro, install: true, home: home)
+        let link = home.appendingPathComponent(".kiro/skills/t")
         #expect(FileManager.default.fileExists(atPath: link.path))
-        try await installer.toggleAgent(name: "t", agent: .cursor, install: false, home: home)
+        try await installer.toggleAgent(name: "t", agent: .kiro, install: false, home: home)
         #expect(!FileManager.default.fileExists(atPath: link.path))
     }
 }
@@ -157,6 +158,71 @@ struct SkillInstallerMultiSkillTests {
         }
     }
 
+    @Test("installGitHub is idempotent: repeat install overwrites dest")
+    func installIdempotentReplacesDest() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let bareRepo = try GitFixtures.makeBareRepoWithRootSKILL(under: dir.url)
+
+        let installer = makeInstaller(home: home)
+        _ = try await installer.installGitHub(
+            sourceURL: bareRepo, owner: "t", repo: "example", ref: "HEAD",
+            skillId: "example", home: home, installTo: [])
+        // Second install must not throw.
+        _ = try await installer.installGitHub(
+            sourceURL: bareRepo, owner: "t", repo: "example", ref: "HEAD",
+            skillId: "example", home: home, installTo: [])
+        let canonical = home.appendingPathComponent(".agents/skills/example")
+        #expect(FileManager.default.fileExists(atPath: canonical.appendingPathComponent("SKILL.md").path))
+    }
+
+    @Test("installGitHub records skillFolderHash and skillPath in lockfile for multi-skill repo")
+    func installRecordsFolderHashAndPath() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let lockPath = home.appendingPathComponent(".agents/.skill-lock.json")
+        let bareRepo = try GitFixtures.makeBareRepoWithSubSkills(
+            under: dir.url, subs: ["sub1"])
+
+        let installer = makeInstaller(home: home)
+        _ = try await installer.installGitHub(
+            sourceURL: bareRepo, owner: "t", repo: "example", ref: "HEAD",
+            skillId: "sub1", home: home, installTo: [])
+        let lock = try LockFile.decode(from: Data(contentsOf: lockPath))
+        let entry = lock.skills.first { $0.name == "sub1" }
+        #expect(entry != nil)
+        #expect(entry?.skillPath == "skills/sub1")
+        #expect(entry?.skillFolderHash != nil)
+        #expect((entry?.skillFolderHash?.count ?? 0) == 40)
+    }
+
+    @Test("toggleAgent skips symlink when fallback chain already grants access")
+    func toggleSkipsInheritedAgent() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let src = try dir.mkdir("inheritSkill")
+        try "---\n---\n".write(
+            to: src.appendingPathComponent("SKILL.md"),
+            atomically: true, encoding: .utf8
+        )
+        let home = try dir.mkdir("home")
+        let installer = SkillInstallerActor(
+            git: GitActor(),
+            symlinker: SymlinkManagerActor(),
+            lockFile: LockFileActor(path: home.appendingPathComponent(".agents/.skill-lock.json")),
+            cache: CommitHashCache(path: home.appendingPathComponent(".agents/.skillport-cache.json"))
+        )
+        _ = try await installer.installLocal(from: src, home: home, installTo: [])
+        // .cursor fallbackChain 包含 .agents/skills；canonical 就在 .agents/skills/inheritSkill
+        // 所以 cursor 可以通过 fallback 读到，无需额外 symlink。
+        try await installer.toggleAgent(
+            name: "inheritSkill", agent: .cursor, install: true, home: home)
+        let link = home.appendingPathComponent(".cursor/skills/inheritSkill")
+        #expect(!FileManager.default.fileExists(atPath: link.path))
+    }
+
     @Test("uninstall after multi-skill install removes the correct canonical dir")
     func uninstallMultiSkill() async throws {
         let dir = try TempDir.create()
@@ -187,7 +253,7 @@ struct SkillInstallerMultiSkillTests {
             symlinker: SymlinkManagerActor(),
             lockFile: LockFileActor(path: home.appendingPathComponent(".agents/.skill-lock.json")),
             cache: CommitHashCache(
-                path: home.appendingPathComponent(".agents/.skillpilot-cache.json"))
+                path: home.appendingPathComponent(".agents/.skillport-cache.json"))
         )
     }
 }

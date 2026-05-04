@@ -1,20 +1,71 @@
 import Foundation
 
+public struct AgentStatus: Sendable, Equatable, Hashable {
+    public let binaryOnPath: Bool
+    public let configDirExists: Bool
+    public let skillsDirExists: Bool
+    public let skillCount: Int
+
+    public init(
+        binaryOnPath: Bool = false,
+        configDirExists: Bool = false,
+        skillsDirExists: Bool = false,
+        skillCount: Int = 0
+    ) {
+        self.binaryOnPath = binaryOnPath
+        self.configDirExists = configDirExists
+        self.skillsDirExists = skillsDirExists
+        self.skillCount = skillCount
+    }
+
+    /// Any of three signals → agent is available. Mirrors parent repo's detector
+    /// which treats `configDirExists || binaryOnPath` as installed.
+    public var isInstalled: Bool {
+        binaryOnPath || configDirExists || skillsDirExists
+    }
+
+    public static let uninstalled = AgentStatus()
+    public static let onPath = AgentStatus(binaryOnPath: true)
+}
+
 public struct Agent: Identifiable, Hashable, Sendable {
     public let id: AgentID
     public let skillsDir: URL
     public let fallbackChain: [URL]
-    public let isInstalled: Bool
+    /// Config root (parent of `skillsDir`). E.g. `~/.claude`, `~/.cursor`.
+    public let configDir: URL?
+    public let status: AgentStatus
 
-    public init(id: AgentID, skillsDir: URL, fallbackChain: [URL], isInstalled: Bool) {
+    public init(
+        id: AgentID,
+        skillsDir: URL,
+        fallbackChain: [URL],
+        configDir: URL? = nil,
+        status: AgentStatus = .uninstalled
+    ) {
         self.id = id
         self.skillsDir = skillsDir
         self.fallbackChain = fallbackChain
-        self.isInstalled = isInstalled
+        self.configDir = configDir
+        self.status = status
     }
 
+    /// Backward-compat init — PATH-only signal. Prefer the `status:` variant.
+    public init(id: AgentID, skillsDir: URL, fallbackChain: [URL], isInstalled: Bool) {
+        self.init(
+            id: id,
+            skillsDir: skillsDir,
+            fallbackChain: fallbackChain,
+            configDir: nil,
+            status: isInstalled ? .onPath : .uninstalled
+        )
+    }
+
+    /// Shorthand used by views that don't care which signal fired.
+    public var isInstalled: Bool { status.isInstalled }
+
     /// 根据家目录 URL 构造 11 个 agent 的默认配置。
-    /// isInstalled 统一设为 false；实际检测结果应由 `AgentDetector` 合并。
+    /// status 统一设为 .uninstalled；实际检测结果由 `AgentDetector` 合并。
     public static func defaultAgents(home: URL) -> [Agent] {
         func dir(_ relative: String) -> URL {
             home.appendingPathComponent(relative)
@@ -27,57 +78,57 @@ public struct Agent: Identifiable, Hashable, Sendable {
                 id: .claudeCode,
                 skillsDir: dir(".claude/skills"),
                 fallbackChain: [],
-                isInstalled: false),
+                configDir: dir(".claude")),
             Agent(
                 id: .codex,
                 skillsDir: dir(".codex/skills"),
                 fallbackChain: [agentsDir],
-                isInstalled: false),
+                configDir: dir(".codex")),
             Agent(
                 id: .gemini,
                 skillsDir: dir(".gemini/skills"),
                 fallbackChain: [agentsDir],
-                isInstalled: false),
+                configDir: dir(".gemini")),
             Agent(
                 id: .copilot,
                 skillsDir: dir(".copilot/skills"),
                 fallbackChain: [claudeDir],
-                isInstalled: false),
+                configDir: dir(".copilot")),
             Agent(
                 id: .opencode,
                 skillsDir: dir(".config/opencode/skills"),
                 fallbackChain: [claudeDir, agentsDir],
-                isInstalled: false),
+                configDir: dir(".config/opencode")),
             Agent(
                 id: .antigravity,
                 skillsDir: dir(".gemini/antigravity/skills"),
                 fallbackChain: [],
-                isInstalled: false),
+                configDir: dir(".gemini/antigravity")),
             Agent(
                 id: .cursor,
                 skillsDir: dir(".cursor/skills"),
                 fallbackChain: [claudeDir, agentsDir],
-                isInstalled: false),
+                configDir: dir(".cursor")),
             Agent(
                 id: .kiro,
                 skillsDir: dir(".kiro/skills"),
                 fallbackChain: [],
-                isInstalled: false),
+                configDir: dir(".kiro")),
             Agent(
                 id: .codebuddy,
                 skillsDir: dir(".codebuddy/skills"),
                 fallbackChain: [],
-                isInstalled: false),
+                configDir: dir(".codebuddy")),
             Agent(
                 id: .openclaw,
                 skillsDir: dir(".openclaw/skills"),
                 fallbackChain: [],
-                isInstalled: false),
+                configDir: dir(".openclaw")),
             Agent(
                 id: .trae,
                 skillsDir: dir(".trae/skills"),
                 fallbackChain: [],
-                isInstalled: false),
+                configDir: dir(".trae")),
         ]
     }
 }

@@ -58,4 +58,56 @@ struct LockFileTests {
             _ = try LockFile.decode(from: badJSON)
         }
     }
+
+    @Test("Round-trip preserves new UX fields (skillFolderHash/skillPath/updatedAt/dismissedUpdate/lastSelectedAgents)")
+    func encodeRoundTripNewFields() throws {
+        let original = LockFile(
+            version: 3,
+            skills: [
+                LockedSkill(
+                    name: "demo",
+                    source: .github(owner: "x", repo: "y", ref: "main"),
+                    installedAt: Date(timeIntervalSince1970: 1_700_000_000),
+                    commitHash: "deadbeef",
+                    path: URL(fileURLWithPath: "/tmp/demo"),
+                    skillFolderHash: "treehash123",
+                    skillPath: "skills/demo",
+                    updatedAt: Date(timeIntervalSince1970: 1_700_001_000),
+                    dismissedUpdate: "olderhash",
+                    lastSelectedAgents: [.claudeCode, .cursor]
+                )
+            ]
+        )
+        let data = try original.encode()
+        let back = try LockFile.decode(from: data)
+        #expect(back.skills.count == 1)
+        let d = back.skills[0]
+        #expect(d.skillFolderHash == "treehash123")
+        #expect(d.skillPath == "skills/demo")
+        #expect(d.updatedAt == Date(timeIntervalSince1970: 1_700_001_000))
+        #expect(d.dismissedUpdate == "olderhash")
+        #expect(d.lastSelectedAgents == Set<AgentID>([.claudeCode, .cursor]))
+    }
+
+    @Test("v3 without new UX fields still decodes (additive compatibility)")
+    func decodeV3WithoutNewFields() throws {
+        let json = #"""
+        {
+          "version": 3,
+          "skills": [
+            {
+              "name": "older",
+              "installedAt": "2026-01-01T00:00:00Z",
+              "path": "/tmp/older",
+              "source": { "type": "github", "owner": "o", "repo": "r", "ref": "main" }
+            }
+          ]
+        }
+        """#.data(using: .utf8)!
+        let lock = try LockFile.decode(from: json)
+        #expect(lock.skills.count == 1)
+        #expect(lock.skills[0].skillFolderHash == nil)
+        #expect(lock.skills[0].skillPath == nil)
+        #expect(lock.skills[0].updatedAt == nil)
+    }
 }

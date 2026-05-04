@@ -52,16 +52,32 @@ struct LockFileActorTests {
         #expect(stillThere == good)
     }
 
-    @Test("Unsupported version rejected")
+    @Test("Unsupported version: file is moved to .bak-<stamp> and read returns empty")
     func rejectsVersionDrift() async throws {
         let dir = try TempDir.create()
         defer { try? dir.cleanup() }
         let path = dir.url.appendingPathComponent(".skill-lock.json")
         try #"{"version": 99, "skills": []}"#.write(to: path, atomically: true, encoding: .utf8)
         let actor = LockFileActor(path: path)
-        await #expect(throws: SkillportError.self) {
-            _ = try await actor.read()
-        }
+        let lock = try await actor.read()
+        #expect(lock.skills.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: path.path))
+        // 应能在同目录找到以 `.bak-` 开头的备份
+        let siblings = try FileManager.default.contentsOfDirectory(
+            at: dir.url, includingPropertiesForKeys: nil)
+        #expect(siblings.contains { $0.lastPathComponent.contains(".bak-") })
+    }
+
+    @Test("Corrupt JSON: file is moved to .bak-<stamp> and read returns empty")
+    func corruptJSONIsRecoveredSilently() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let path = dir.url.appendingPathComponent(".skill-lock.json")
+        try "not json at all {".write(to: path, atomically: true, encoding: .utf8)
+        let actor = LockFileActor(path: path)
+        let lock = try await actor.read()
+        #expect(lock.skills.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: path.path))
     }
 
     @Test("upsert(LockedSkill) adds new then replaces by name")

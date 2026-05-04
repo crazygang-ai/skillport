@@ -41,7 +41,7 @@ struct SkillManagerActorTests {
 
     private func makeManager(home: URL) -> SkillManagerActor {
         let lockPath = home.appendingPathComponent(".agents/.skill-lock.json")
-        let cachePath = home.appendingPathComponent(".agents/.skillpilot-cache.json")
+        let cachePath = home.appendingPathComponent(".agents/.skillport-cache.json")
         let lockFile = LockFileActor(path: lockPath)
         return SkillManagerActor(
             scanner: SkillScannerActor(),

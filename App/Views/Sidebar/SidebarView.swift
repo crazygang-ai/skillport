@@ -14,7 +14,7 @@ struct SidebarView: View {
             }
 
             Section(String(localized: "Filter by agent")) {
-                ForEach(skillsModel.agents, id: \.id) { agent in
+                ForEach(skillsModel.agents.filter(\.isInstalled), id: \.id) { agent in
                     Label(agent.id.displayName, systemImage: "cube")
                         .tag(SidebarSelection.agent(agent.id))
                 }

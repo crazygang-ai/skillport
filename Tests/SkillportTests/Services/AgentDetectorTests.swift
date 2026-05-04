@@ -42,4 +42,38 @@ struct AgentDetectorTests {
         #expect(map[.claudeCode] == false)
         #expect(map.count == AgentID.allCases.count)
     }
+
+    @Test("detectAllStatuses marks agent installed when only configDir exists (no PATH binary)")
+    func statusesConfigDirFallback() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        // codex 二进制不在 PATH，但 `~/.codex` 存在 → should still be isInstalled
+        try FileManager.default.createDirectory(
+            at: home.appendingPathComponent(".codex"), withIntermediateDirectories: true)
+        let emptyBin = try dir.mkdir("emptybin")
+        let detector = AgentDetector(pathOverride: emptyBin.path)
+        let map = try await detector.detectAllStatuses(home: home)
+        let codex = map[.codex] ?? .uninstalled
+        #expect(codex.binaryOnPath == false)
+        #expect(codex.configDirExists == true)
+        #expect(codex.isInstalled == true)
+        // claudeCode 没 configDir 也没 binary → uninstalled
+        #expect(map[.claudeCode]?.isInstalled == false)
+    }
+
+    @Test("detectAllStatuses counts skills under skillsDir")
+    func statusesSkillCount() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let claudeSkills = home.appendingPathComponent(".claude/skills")
+        try FileManager.default.createDirectory(at: claudeSkills.appendingPathComponent("a"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: claudeSkills.appendingPathComponent("b"), withIntermediateDirectories: true)
+        let emptyBin = try dir.mkdir("emptybin")
+        let detector = AgentDetector(pathOverride: emptyBin.path)
+        let map = try await detector.detectAllStatuses(home: home)
+        #expect(map[.claudeCode]?.skillsDirExists == true)
+        #expect(map[.claudeCode]?.skillCount == 2)
+    }
 }

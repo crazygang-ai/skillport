@@ -53,7 +53,7 @@ public actor RegistryActor {
     // MARK: - Search
 
     public func search(query: String, limit: Int = 50) async throws -> [RegistrySkill] {
-        let clampedLimit = min(max(1, limit), 100)
+        let clampedLimit = min(max(1, limit), 500)
         var comps = URLComponents(
             url: baseURL.appendingPathComponent("/api/search"),
             resolvingAgainstBaseURL: false

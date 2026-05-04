@@ -8,11 +8,57 @@ public struct AgentDetector: Sendable {
     }
 
     public func isInstalled(agentID: AgentID) async throws -> Bool {
-        let paths = (pathOverride ?? ProcessInfo.processInfo.environment["PATH"] ?? "")
-            .split(separator: ":")
-            .map(String.init)
+        let searchPath = await resolvedSearchPath()
+        return binaryOnPath(agentID: agentID, in: searchPath)
+    }
+
+    public func detectAll() async throws -> [AgentID: Bool] {
+        // Resolve once — login-shell probe is the slow bit, no sense doing it 11 times.
+        let searchPath = await resolvedSearchPath()
+        var result: [AgentID: Bool] = [:]
+        for id in AgentID.allCases {
+            result[id] = binaryOnPath(agentID: id, in: searchPath)
+        }
+        return result
+    }
+
+    /// 为每个 agent 汇总三路信号：PATH 上的二进制、configDir、skillsDir。
+    /// 对应 Electron 版的 `agent-detector` — GUI 启动没 PATH 但用户装了 `.claude` 时仍视为已安装。
+    public func detectAllStatuses(home: URL) async throws -> [AgentID: AgentStatus] {
+        let searchPath = await resolvedSearchPath()
+        let fm = FileManager.default
+        var result: [AgentID: AgentStatus] = [:]
+        for agent in Agent.defaultAgents(home: home) {
+            let onPath = binaryOnPath(agentID: agent.id, in: searchPath)
+            let configExists = agent.configDir.map { fm.fileExists(atPath: $0.path) } ?? false
+            let skillsExists = fm.fileExists(atPath: agent.skillsDir.path)
+            let skillCount: Int
+            if skillsExists,
+                let entries = try? fm.contentsOfDirectory(
+                    at: agent.skillsDir,
+                    includingPropertiesForKeys: [.isDirectoryKey],
+                    options: [.skipsHiddenFiles]
+                )
+            {
+                skillCount = entries.count
+            } else {
+                skillCount = 0
+            }
+            result[agent.id] = AgentStatus(
+                binaryOnPath: onPath,
+                configDirExists: configExists,
+                skillsDirExists: skillsExists,
+                skillCount: skillCount
+            )
+        }
+        return result
+    }
+
+    // MARK: - Internals
+
+    private func binaryOnPath(agentID: AgentID, in searchPath: String) -> Bool {
         let binaryName = agentID.binaryName
-        for dir in paths {
+        for dir in searchPath.split(separator: ":").map(String.init) {
             let candidate = dir + "/" + binaryName
             var isDir: ObjCBool = false
             if FileManager.default.fileExists(atPath: candidate, isDirectory: &isDir),
@@ -25,11 +71,44 @@ public struct AgentDetector: Sendable {
         return false
     }
 
-    public func detectAll() async throws -> [AgentID: Bool] {
-        var result: [AgentID: Bool] = [:]
-        for id in AgentID.allCases {
-            result[id] = try await isInstalled(agentID: id)
+    /// GUI apps on macOS inherit a minimal PATH (`/usr/bin:/bin:/usr/sbin:/sbin`) so
+    /// Homebrew, nvm, pyenv, cargo, etc. are invisible. Run a login shell once to pick
+    /// up the user's real PATH from rc files. Falls back to the process PATH if that fails.
+    private func resolvedSearchPath() async -> String {
+        if let override = pathOverride { return override }
+        if let loginPath = await loginShellPath(), !loginPath.isEmpty {
+            return loginPath
         }
-        return result
+        return ProcessInfo.processInfo.environment["PATH"] ?? ""
+    }
+
+    private func loginShellPath() async -> String? {
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        return await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: shell)
+            // `-ilc` runs an interactive login shell so both `.zprofile` and `.zshrc`
+            // get sourced — nvm/pyenv/asdf typically inject PATH from rc, not profile.
+            // `printf` avoids trailing-newline quirks.
+            p.arguments = ["-ilc", "printf %s \"$PATH\""]
+            let out = Pipe()
+            p.standardOutput = out
+            p.standardError = Pipe()
+            p.terminationHandler = { _ in
+                let data = (try? out.fileHandleForReading.readToEnd()) ?? nil ?? Data()
+                let s = String(data: data, encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if let s, !s.isEmpty {
+                    continuation.resume(returning: s)
+                } else {
+                    continuation.resume(returning: nil)
+                }
+            }
+            do {
+                try p.run()
+            } catch {
+                continuation.resume(returning: nil)
+            }
+        }
     }
 }
