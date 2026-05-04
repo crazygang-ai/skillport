@@ -5,6 +5,7 @@ struct FrontmatterForm: View {
 
     var body: some View {
         Form {
+            // Description 是多段长文（新版 skill 常有上千字），用 axis:.vertical + 弹性行数。
             TextField(
                 "Description",
                 text: Binding(
@@ -13,7 +14,10 @@ struct FrontmatterForm: View {
                         state.metadata.description = $0.isEmpty ? nil : $0
                         state.isDirty = true
                     }
-                ))
+                ),
+                axis: .vertical
+            )
+            .lineLimit(3...8)
             TextField(
                 "Version",
                 text: Binding(
