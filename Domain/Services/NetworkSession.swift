@@ -20,6 +20,11 @@ public enum NetworkSession {
                 dict[kCFStreamPropertySOCKSProxyPort] = proxy.port as NSNumber
                 dict[kCFStreamPropertySOCKSVersion] = kCFStreamSocketSOCKSVersion5
             }
+            // bypass 列表（domain glob，如 `*.internal`、`10.*`）。CFNetwork 将其作为
+            // `ExceptionsList` 读取；对 HTTPS / SOCKS 两种 proxy 均生效。
+            if let bypass = proxy.bypassList, !bypass.isEmpty {
+                dict[kCFNetworkProxiesExceptionsList] = bypass
+            }
             config.connectionProxyDictionary = dict
         }
         return URLSession(configuration: config)

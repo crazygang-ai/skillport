@@ -33,7 +33,7 @@
             <string>Skillport</string>
             <key>CFBundleURLSchemes</key>
             <array>
-                <string>skillpilot</string>
+                <string>skillport</string>
             </array>
         </dict>
     </array>
