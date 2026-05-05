@@ -18,8 +18,7 @@ public struct AgentStatus: Sendable, Equatable, Hashable {
         self.skillCount = skillCount
     }
 
-    /// Any of three signals → agent is available. Mirrors parent repo's detector
-    /// which treats `configDirExists || binaryOnPath` as installed.
+    /// Any of three signals means the agent is available enough to show in the UI.
     public var isInstalled: Bool {
         binaryOnPath || configDirExists || skillsDirExists
     }
@@ -48,17 +47,6 @@ public struct Agent: Identifiable, Hashable, Sendable {
         self.fallbackChain = fallbackChain
         self.configDir = configDir
         self.status = status
-    }
-
-    /// Backward-compat init — PATH-only signal. Prefer the `status:` variant.
-    public init(id: AgentID, skillsDir: URL, fallbackChain: [URL], isInstalled: Bool) {
-        self.init(
-            id: id,
-            skillsDir: skillsDir,
-            fallbackChain: fallbackChain,
-            configDir: nil,
-            status: isInstalled ? .onPath : .uninstalled
-        )
     }
 
     /// Shorthand used by views that don't care which signal fired.

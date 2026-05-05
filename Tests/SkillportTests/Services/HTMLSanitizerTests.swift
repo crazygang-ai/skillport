@@ -3,7 +3,7 @@ import Testing
 
 @testable import Skillport
 
-@Suite("HTMLSanitizer — allowlist parity with Electron sanitizeRemoteHtml")
+@Suite("HTMLSanitizer — allowlist")
 struct HTMLSanitizerTests {
     let sanitizer = HTMLSanitizer()
 

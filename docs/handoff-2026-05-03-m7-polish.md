@@ -6,7 +6,7 @@
 
 ## 项目背景
 
-Skillport = macOS 原生管理 AI agent skills 的 SwiftUI app，从 Electron 版 SkillPilot 重写。
+Skillport = macOS 原生管理 AI agent skills 的 SwiftUI app。
 
 **仓库位置**：
 - 主项目代码：`/Users/crazy/own_project/skillport/`（push 到 `git@github.com:crazygang-ai/skillport.git` 的 `main`）
@@ -33,7 +33,7 @@ Skillport = macOS 原生管理 AI agent skills 的 SwiftUI app，从 Electron �
 ### Phase 1：多-skill repo App 内 install（M5 ADR-M5-2 欠账清偿）
 - `SkillInstallerActor.installGitHub` 新增 `skillId` 参数 + sourceURL overload
 - Multi-skill 走 "clone to tmp → move subdir to canonical → clean tmp" 策略
-- Canonical dir 用 `skillId` 命名（与 Electron CLI `npx skills add --skill X` 对齐）
+- Canonical dir 用 `skillId` 命名（与 `npx skills add --skill X` 的用户语义一致）
 - `RegistryModel.installSelected` 取消 `isSingleSkillRepo` gate
 - RegistryDetailPanel Install 按钮对所有 entry 启用
 - 新 test helper `Tests/SkillportTests/TestSupport/GitFixtures.swift`（造本地 bare repo）

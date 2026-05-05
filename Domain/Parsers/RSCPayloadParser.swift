@@ -3,8 +3,6 @@ import OSLog
 
 /// 从 skills.sh 的 Next.js RSC flight payload 里提取 `initialSkills` 数组。
 ///
-/// 逻辑 1:1 port 自 Electron 版 `electron/services/skill-registry-service.ts` 的
-/// `parseLeaderboardHTML` + `extractDoubleEscapedArray` + `decodeDoubleEscapedJson`。
 /// skills.sh 没有公开 JSON API, 必须靠抓 HTML 里的序列化 state 树。
 /// 此 parser 对 payload 格式变化脆弱; 生产故障时靠空列表降级, 不 throw。
 public enum RSCPayloadParser {
@@ -44,7 +42,7 @@ public enum RSCPayloadParser {
     // MARK: - State machine
 
     /// 单遍状态机, 从 `[` 开始扫到匹配的 `]`。返回切片 [start, end], 含首尾 []。
-    /// 参考 Electron 版注释:
+    /// RSC payload 中的转义规则：
     ///   - `\\` → 字面反斜杠 (原子消费两字符)
     ///   - `\"` → 内部 JSON 字符串分隔符 (切换 inString 状态)
     public static func extractDoubleEscapedArray(in html: String, startingAt offset: Int) -> String? {
@@ -91,8 +89,7 @@ public enum RSCPayloadParser {
 
     // MARK: - Decoding
 
-    /// 用 JSONDecoder 把 RSC 的"双重转义"字符串还原一层 — 与 Electron 版
-    /// `JSON.parse('"' + rawChunk + '"')` 等价。
+    /// 用 JSONDecoder 把 RSC 的"双重转义"字符串还原一层。
     public static func decodeDoubleEscapedJson(_ rawChunk: String) throws -> String {
         let wrapped = "\"\(rawChunk)\""
         guard let data = wrapped.data(using: .utf8) else {

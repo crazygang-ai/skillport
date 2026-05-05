@@ -39,12 +39,6 @@ public actor GitActor {
         return hash.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Deprecated: misnamed — ls-remote returns a **commit** hash, not a tree hash.
-    /// Kept for compatibility with callers during transition. Prefer `remoteCommitHash`.
-    public func remoteTreeHash(url: URL, ref: String) async throws -> String {
-        try await remoteCommitHash(url: url, ref: ref)
-    }
-
     public func fetch(in repo: URL, ref: String? = nil) async throws {
         var args = ["fetch", "--depth", "1", "origin"]
         if let ref, !ref.isEmpty { args.append(ref) }

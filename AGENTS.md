@@ -28,5 +28,4 @@ xcodebuild -scheme Skillport -derivedDataPath build/DerivedData -destination pla
 
 ## Related
 
-Parent repo: `crazygang-ai/skillpilot` (Electron 版，保持独立演进)
-Design spec: 参见 parent repo `docs/superpowers/specs/2026-05-02-skillport-native-rewrite-design.md`
+Design notes: see `docs/`.

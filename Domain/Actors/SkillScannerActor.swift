@@ -68,7 +68,7 @@ public actor SkillScannerActor {
         )
     }
 
-    /// Two-pass detection, mirroring parent repo's `findInstallations`:
+    /// Two-pass detection:
     ///   Pass 1 — direct symlink at `agent.skillsDir/<name>` pointing to canonical.
     ///   Pass 2 — any `agent.fallbackChain/<name>` whose realpath matches canonical
     ///            (soft inheritance; e.g. codex reads `.agents/skills` via fallback).
@@ -103,7 +103,8 @@ public actor SkillScannerActor {
     private func matchesCanonical(at candidate: URL, canonical: String) -> Bool {
         let fm = FileManager.default
         if let raw = try? fm.destinationOfSymbolicLink(atPath: candidate.path) {
-            let target = raw.hasPrefix("/")
+            let target =
+                raw.hasPrefix("/")
                 ? URL(fileURLWithPath: raw)
                 : candidate.deletingLastPathComponent().appendingPathComponent(raw)
             return target.resolvingSymlinksInPath().path == canonical

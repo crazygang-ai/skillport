@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import Skillport
 
 @Suite("LockFile")
@@ -89,21 +90,21 @@ struct LockFileTests {
         #expect(d.lastSelectedAgents == Set<AgentID>([.claudeCode, .cursor]))
     }
 
-    @Test("v3 without new UX fields still decodes (additive compatibility)")
+    @Test("v3 without new UX fields still decodes")
     func decodeV3WithoutNewFields() throws {
         let json = #"""
-        {
-          "version": 3,
-          "skills": [
             {
-              "name": "older",
-              "installedAt": "2026-01-01T00:00:00Z",
-              "path": "/tmp/older",
-              "source": { "type": "github", "owner": "o", "repo": "r", "ref": "main" }
+              "version": 3,
+              "skills": [
+                {
+                  "name": "older",
+                  "installedAt": "2026-01-01T00:00:00Z",
+                  "path": "/tmp/older",
+                  "source": { "type": "github", "owner": "o", "repo": "r", "ref": "main" }
+                }
+              ]
             }
-          ]
-        }
-        """#.data(using: .utf8)!
+            """#.data(using: .utf8)!
         let lock = try LockFile.decode(from: json)
         #expect(lock.skills.count == 1)
         #expect(lock.skills[0].skillFolderHash == nil)

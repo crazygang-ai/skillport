@@ -1,6 +1,6 @@
 # Skillport
 
-Native macOS app for managing AI agent skills. Rewrite of [SkillPilot](https://github.com/crazygang-ai/skillpilot) in Swift/SwiftUI.
+Native Swift/SwiftUI macOS app for managing AI agent skills.
 
 **Status:** Early development. Not yet released.
 

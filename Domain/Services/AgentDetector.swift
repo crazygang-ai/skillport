@@ -23,7 +23,7 @@ public struct AgentDetector: Sendable {
     }
 
     /// 为每个 agent 汇总三路信号：PATH 上的二进制、configDir、skillsDir。
-    /// 对应 Electron 版的 `agent-detector` — GUI 启动没 PATH 但用户装了 `.claude` 时仍视为已安装。
+    /// GUI 启动时 PATH 可能不完整；configDir / skillsDir 也作为可用性信号。
     public func detectAllStatuses(home: URL) async throws -> [AgentID: AgentStatus] {
         let searchPath = await resolvedSearchPath()
         let fm = FileManager.default

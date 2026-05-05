@@ -27,7 +27,7 @@ public final class MockURLProtocol: URLProtocol {
     private nonisolated(unsafe) static var _matchers: [(Matcher, Handler)] = []
     private nonisolated(unsafe) static var _requestLog: [URLRequest] = []
 
-    // MARK: - Registration (async variants kept for back-compat)
+    // MARK: - Registration (async)
 
     public static func stub(url: URL, handler: @escaping Handler) async {
         _lock.withLock { _handlers[url] = handler }
@@ -41,7 +41,7 @@ public final class MockURLProtocol: URLProtocol {
         }
     }
 
-    // MARK: - Registration (sync convenience, M5)
+    // MARK: - Registration (sync convenience)
 
     public static func resetSync() {
         _lock.withLock {

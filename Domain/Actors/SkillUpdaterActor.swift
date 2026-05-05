@@ -40,7 +40,8 @@ public actor SkillUpdaterActor {
             let baseline = locked?.skillFolderHash
             let dismissed = locked?.dismissedUpdate
             let id = SkillIdentity.compute(name: name, source: source)
-            let url = remoteURLOverride
+            let url =
+                remoteURLOverride
                 ?? URL(string: "https://github.com/\(owner)/\(repo).git")!
 
             // 拿到 remote subdir tree hash 的流程：acquire cache → subdirTreeHash。
@@ -114,7 +115,8 @@ public actor SkillUpdaterActor {
         guard case .github(let owner, let repo, let ref) = source else {
             throw SkillportError.unexpected("apply() only supports github sources (got \(source))")
         }
-        let url = remoteURLOverride
+        let url =
+            remoteURLOverride
             ?? URL(string: "https://github.com/\(owner)/\(repo).git")!
         let cached = try await repoCache.acquire(url: url, ref: ref)
 
@@ -171,11 +173,6 @@ public actor SkillUpdaterActor {
             try? await cache.set(identity: id, hash: commit)
         }
         return newHash
-    }
-
-    /// Deprecated — prefer `apply`. Kept only because external callers may still use it.
-    public func pull(name: String, canonical: URL) async throws {
-        try await git.pull(in: canonical)
     }
 
     // MARK: - Internals

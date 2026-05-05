@@ -1,7 +1,6 @@
 import Foundation
 
 /// 纯函数：拆分 SKILL.md 的 frontmatter 与 body；序列化反之。
-/// 对应 TS `skill-md-parser.ts`。
 public enum SKILLMdParser {
     public struct ParseResult: Sendable {
         public let metadata: SKILLMetadata

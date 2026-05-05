@@ -1,7 +1,6 @@
 import Foundation
 
 /// 从 Domain actor 流向 Observable model 的事件。
-/// 替代 Electron 版的 EventEmitter + IPC。
 public enum DomainEvent: Sendable {
     /// 全量重扫完成
     case skillsReloaded(skills: [Skill])

@@ -15,7 +15,7 @@ public enum AgentID: String, CaseIterable, Codable, Hashable, Sendable {
 }
 
 extension AgentID {
-    /// 显示名称，对应 Electron 版 agent-detector 的 label。
+    /// UI 展示名称。
     public var displayName: String {
         switch self {
         case .claudeCode: return "Claude Code"
