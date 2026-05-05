@@ -146,6 +146,55 @@ struct SkillUpdaterSubdirTests {
         #expect(status == .upToDate)
     }
 
+    @Test("checkStatus uses local tree hash when lockfile has no baseline")
+    func noBaselineUsesLocalTreeHash() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let bareRepo = try GitFixtures.makeBareRepoWithSubSkills(
+            under: dir.url, subs: ["legacy"])
+
+        let cache = CommitHashCache(path: home.appendingPathComponent(".cache.json"))
+        let lockFile = LockFileActor(path: home.appendingPathComponent(".agents/.skill-lock.json"))
+        let repoCache = RepoCacheActor(
+            git: GitActor(), root: dir.url.appendingPathComponent("rc"))
+        let installer = SkillInstallerActor(
+            git: GitActor(), symlinker: SymlinkManagerActor(),
+            lockFile: lockFile, cache: cache, repoCache: repoCache
+        )
+        _ = try await installer.installGitHub(
+            sourceURL: bareRepo, owner: "t", repo: "example", ref: "HEAD",
+            skillId: "legacy", home: home, installTo: [])
+
+        let lock = try await lockFile.read()
+        let orig = try #require(lock.skills.first(where: { $0.name == "legacy" }))
+        try await lockFile.upsert(
+            LockedSkill(
+                name: orig.name,
+                source: orig.source,
+                installedAt: orig.installedAt,
+                commitHash: orig.commitHash,
+                path: orig.path,
+                skillFolderHash: nil,
+                skillPath: orig.skillPath,
+                updatedAt: orig.updatedAt,
+                dismissedUpdate: nil,
+                lastSelectedAgents: orig.lastSelectedAgents
+            )
+        )
+
+        let updater = SkillUpdaterActor(
+            git: GitActor(), cache: cache, repoCache: repoCache, lockFile: lockFile)
+        let status = try await updater.checkStatus(
+            name: "legacy",
+            source: orig.source,
+            canonical: orig.path,
+            remoteURLOverride: bareRepo
+        )
+
+        #expect(status == .upToDate)
+    }
+
     @Test("checkStatus treats dismissed remote hash as upToDate")
     func dismissedHashIsUpToDate() async throws {
         let dir = try TempDir.create()
@@ -234,5 +283,29 @@ struct SkillUpdaterSubdirTests {
             contentsOf: canonical.appendingPathComponent("SKILL.md"), encoding: .utf8)
         #expect(after.contains("# delta"))  // fixture body
         #expect(!after.contains("junk"))
+    }
+
+    @Test("apply rejects lockfile skillPath escaping cached repo")
+    func applyRejectsEscapingSkillPath() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let bareRepo = try GitFixtures.makeBareRepoWithSubSkills(
+            under: dir.url, subs: ["epsilon"])
+        let canonical = try AgentsFS.createCanonicalSkill(in: home, name: "epsilon")
+        let cache = CommitHashCache(path: home.appendingPathComponent(".cache.json"))
+        let repoCache = RepoCacheActor(
+            git: GitActor(), root: dir.url.appendingPathComponent("rc"))
+        let updater = SkillUpdaterActor(git: GitActor(), cache: cache, repoCache: repoCache)
+
+        await #expect(throws: SkillportError.self) {
+            _ = try await updater.apply(
+                name: "epsilon",
+                source: .github(owner: "t", repo: "example", ref: "HEAD"),
+                canonical: canonical,
+                skillPath: "../outside",
+                remoteURLOverride: bareRepo
+            )
+        }
     }
 }

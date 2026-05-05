@@ -36,7 +36,13 @@ struct DashboardView: View {
                                 }
                             }
                         },
-                        onOpen: { app.openEditor(for: skill.id) }
+                        onOpen: { app.openEditor(for: skill.id) },
+                        onApplyUpdate: {
+                            Task { await applyUpdate(skill) }
+                        },
+                        onDismissUpdate: { remoteHash in
+                            Task { await dismissUpdate(skill, remoteHash: remoteHash) }
+                        }
                     )
                 }
                 .listStyle(.inset)
@@ -99,6 +105,32 @@ struct DashboardView: View {
                         message: String(
                             localized: "Import failed: \(error.localizedDescription)")))
             }
+        }
+    }
+
+    private func applyUpdate(_ skill: Skill) async {
+        do {
+            try await skillsModel.applyUpdate(name: skill.name)
+            notifications.post(
+                .init(level: .success, message: String(localized: "Updated \(skill.name)")))
+        } catch {
+            notifications.post(
+                .init(
+                    level: .error,
+                    message: String(localized: "Update failed: \(error.localizedDescription)")))
+        }
+    }
+
+    private func dismissUpdate(_ skill: Skill, remoteHash: String) async {
+        do {
+            try await skillsModel.dismissUpdate(name: skill.name, remoteHash: remoteHash)
+            notifications.post(
+                .init(level: .success, message: String(localized: "Dismissed update for \(skill.name)")))
+        } catch {
+            notifications.post(
+                .init(
+                    level: .error,
+                    message: String(localized: "Dismiss failed: \(error.localizedDescription)")))
         }
     }
 

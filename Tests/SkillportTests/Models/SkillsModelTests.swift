@@ -112,6 +112,39 @@ struct SkillsModelTests {
         #expect(byName["beta"] == .upToDate)
     }
 
+    @Test("dismissUpdate marks model up-to-date and records dismissed hash")
+    func dismissUpdateWritesLockfileAndModel() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let canonical = try AgentsFS.createCanonicalSkill(in: dir.url, name: "alpha")
+        let lockPath = dir.url.appendingPathComponent(".agents/.skill-lock.json")
+        let lockFile = LockFileActor(path: lockPath)
+        let source = SkillSource.github(owner: "owner", repo: "repo", ref: "main")
+        try await lockFile.upsert(
+            LockedSkill(
+                name: "alpha",
+                source: source,
+                installedAt: Date(),
+                commitHash: nil,
+                path: canonical
+            )
+        )
+        let checker = BatchUpdateCheckerActor(maxConcurrent: 1) { skill in
+            skill.name == "alpha" ? .available(remoteHash: "remote-alpha") : .upToDate
+        }
+        let manager = makeManager(home: dir.url, batchChecker: checker)
+        let model = SkillsModel(manager: manager, home: dir.url)
+        try await model.refresh()
+        _ = try await model.checkAllUpdates()
+
+        try await model.dismissUpdate(name: "alpha", remoteHash: "remote-alpha")
+
+        let skill = try #require(model.skills.first { $0.name == "alpha" })
+        #expect(skill.updateStatus == .upToDate)
+        let lock = try await lockFile.read()
+        #expect(lock.skills.first { $0.name == "alpha" }?.dismissedUpdate == "remote-alpha")
+    }
+
     private func makeManager(
         home: URL,
         batchChecker: BatchUpdateCheckerActor? = nil

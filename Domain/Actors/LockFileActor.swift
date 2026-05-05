@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 public actor LockFileActor {
     public struct ReadResult: Sendable {
@@ -8,9 +9,13 @@ public actor LockFileActor {
     }
 
     private let path: URL
+    private let lockPath: URL
+    private static let lockTimeout: TimeInterval = 5
+    private static let staleLockInterval: TimeInterval = 30
 
     public init(path: URL) {
         self.path = path
+        self.lockPath = path.appendingPathExtension("lock")
     }
 
     public func read() throws -> LockFile {
@@ -19,6 +24,35 @@ public actor LockFileActor {
     }
 
     public func readWithRecoveryNotice() throws -> ReadResult {
+        try withFileLock {
+            try readWithRecoveryNoticeUnlocked()
+        }
+    }
+
+    public func write(_ lock: LockFile) throws {
+        try withFileLock {
+            try writeUnlocked(lock)
+        }
+    }
+
+    public func upsert(_ skill: LockedSkill) throws {
+        try withFileLock {
+            var lock = try readWithRecoveryNoticeUnlocked().lockFile
+            lock.skills.removeAll { $0.name == skill.name }
+            lock.skills.append(skill)
+            try writeUnlocked(lock)
+        }
+    }
+
+    public func remove(name: String) throws {
+        try withFileLock {
+            var lock = try readWithRecoveryNoticeUnlocked().lockFile
+            lock.skills.removeAll { $0.name == name }
+            try writeUnlocked(lock)
+        }
+    }
+
+    private func readWithRecoveryNoticeUnlocked() throws -> ReadResult {
         guard FileManager.default.fileExists(atPath: path.path) else {
             return ReadResult(
                 lockFile: LockFile(version: LockFile.currentVersion, skills: []),
@@ -49,22 +83,9 @@ public actor LockFileActor {
         }
     }
 
-    public func write(_ lock: LockFile) throws {
+    private func writeUnlocked(_ lock: LockFile) throws {
         let data = try lock.encode()
         try writeAtomically(data: data, to: path)
-    }
-
-    public func upsert(_ skill: LockedSkill) throws {
-        var lock = try read()
-        lock.skills.removeAll { $0.name == skill.name }
-        lock.skills.append(skill)
-        try write(lock)
-    }
-
-    public func remove(name: String) throws {
-        var lock = try read()
-        lock.skills.removeAll { $0.name == name }
-        try write(lock)
     }
 
     private func writeAtomically(data: Data, to destination: URL) throws {
@@ -77,5 +98,60 @@ public actor LockFileActor {
         } else {
             try FileManager.default.moveItem(at: tmp, to: destination)
         }
+    }
+
+    private func withFileLock<T>(_ body: () throws -> T) throws -> T {
+        try acquireFileLock()
+        defer { releaseFileLock() }
+        return try body()
+    }
+
+    private func acquireFileLock() throws {
+        let fm = FileManager.default
+        try fm.createDirectory(
+            at: lockPath.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let deadline = Date().addingTimeInterval(Self.lockTimeout)
+        while true {
+            let fd = Darwin.open(lockPath.path, O_CREAT | O_EXCL | O_WRONLY, S_IRUSR | S_IWUSR)
+            if fd >= 0 {
+                let pid = Data("\(getpid())".utf8)
+                _ = pid.withUnsafeBytes { buffer in
+                    Darwin.write(fd, buffer.baseAddress, buffer.count)
+                }
+                Darwin.close(fd)
+                return
+            }
+
+            let code = errno
+            if code != EEXIST {
+                throw SkillportError.fileIO(
+                    path: lockPath,
+                    reason: "failed to acquire lock: \(String(cString: strerror(code)))"
+                )
+            }
+
+            removeStaleLockIfNeeded()
+            if Date() >= deadline {
+                throw SkillportError.fileIO(path: lockPath, reason: "timed out acquiring lock")
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+    }
+
+    private func removeStaleLockIfNeeded() {
+        guard
+            let attrs = try? FileManager.default.attributesOfItem(atPath: lockPath.path),
+            let modified = attrs[.modificationDate] as? Date,
+            Date().timeIntervalSince(modified) > Self.staleLockInterval
+        else {
+            return
+        }
+        try? FileManager.default.removeItem(at: lockPath)
+    }
+
+    private func releaseFileLock() {
+        try? FileManager.default.removeItem(at: lockPath)
     }
 }

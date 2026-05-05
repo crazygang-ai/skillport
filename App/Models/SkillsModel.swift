@@ -121,6 +121,18 @@ public final class SkillsModel {
         return results
     }
 
+    public func applyUpdate(name: String) async throws {
+        try await manager.applyUpdate(name: name, home: home)
+        let list = try await manager.rescan(home: home)
+        skills = list
+    }
+
+    public func dismissUpdate(name: String, remoteHash: String) async throws {
+        try await manager.dismissUpdate(name: name, remoteHash: remoteHash)
+        let list = try await manager.rescan(home: home)
+        skills = list
+    }
+
     public func skillsFiltered(by agent: AgentID?) -> [Skill] {
         guard let agent else { return skills }
         return skills.filter { $0.installedAgents.contains(agent) }

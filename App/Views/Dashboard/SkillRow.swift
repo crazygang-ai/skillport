@@ -4,6 +4,8 @@ struct SkillRow: View {
     let skill: Skill
     let onToggle: (AgentID, Bool) -> Void
     let onOpen: () -> Void
+    let onApplyUpdate: () -> Void
+    let onDismissUpdate: (String) -> Void
 
     @Environment(SkillsModel.self) private var skillsModel
 
@@ -21,6 +23,12 @@ struct SkillRow: View {
                     }
                 }
                 Spacer()
+                UpdateActions(
+                    skill: skill,
+                    isManagedBySkillport: skillsModel.isManagedSkill(skill),
+                    onApplyUpdate: onApplyUpdate,
+                    onDismissUpdate: onDismissUpdate
+                )
                 Button(action: onOpen) {
                     Image(systemName: "pencil")
                 }
@@ -35,6 +43,33 @@ struct SkillRow: View {
             )
         }
         .padding(.vertical, 6)
+    }
+}
+
+private struct UpdateActions: View {
+    let skill: Skill
+    let isManagedBySkillport: Bool
+    let onApplyUpdate: () -> Void
+    let onDismissUpdate: (String) -> Void
+
+    var body: some View {
+        if case .available(let remoteHash) = skill.updateStatus, isManagedBySkillport {
+            HStack(spacing: 6) {
+                Button(action: onApplyUpdate) {
+                    Label(String(localized: "Update"), systemImage: "arrow.down.circle")
+                }
+                .buttonStyle(.borderless)
+                .help(String(localized: "Update this skill"))
+
+                Button {
+                    onDismissUpdate(remoteHash)
+                } label: {
+                    Image(systemName: "xmark.circle")
+                }
+                .buttonStyle(.borderless)
+                .help(String(localized: "Dismiss this update"))
+            }
+        }
     }
 }
 

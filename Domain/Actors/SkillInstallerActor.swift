@@ -200,7 +200,9 @@ public actor SkillInstallerActor {
         if fm.fileExists(atPath: backup.path) {
             try? fm.removeItem(at: backup)
         }
-        if let commitHash {
+        if let folderHash {
+            try? await cache.set(identity: identity, hash: folderHash)
+        } else if let commitHash {
             try? await cache.set(identity: identity, hash: commitHash)
         }
         return Skill(

@@ -136,4 +136,34 @@ struct LockFileActorTests {
         let lock = try await actor.read()
         #expect(lock.skills.isEmpty)
     }
+
+    @Test("concurrent upserts from separate actors preserve both entries")
+    func concurrentUpsertsPreserveEntries() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let path = dir.url.appendingPathComponent(".skill-lock.json")
+        let firstActor = LockFileActor(path: path)
+        let secondActor = LockFileActor(path: path)
+        let first = LockedSkill(
+            name: "first",
+            source: .local(path: URL(fileURLWithPath: "/first")),
+            installedAt: Date(),
+            commitHash: nil,
+            path: URL(fileURLWithPath: "/tmp/first")
+        )
+        let second = LockedSkill(
+            name: "second",
+            source: .local(path: URL(fileURLWithPath: "/second")),
+            installedAt: Date(),
+            commitHash: nil,
+            path: URL(fileURLWithPath: "/tmp/second")
+        )
+
+        async let firstWrite: Void = firstActor.upsert(first)
+        async let secondWrite: Void = secondActor.upsert(second)
+        _ = try await (firstWrite, secondWrite)
+
+        let lock = try await LockFileActor(path: path).read()
+        #expect(Set(lock.skills.map(\.name)) == ["first", "second"])
+    }
 }
