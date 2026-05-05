@@ -24,6 +24,28 @@ public struct DirectoryReplacement: Sendable {
     }
 }
 
+public struct DirectoryRemoval: Sendable {
+    public let destination: URL
+    public let staged: URL
+
+    public func commit() throws {
+        guard FileManager.default.fileExists(atPath: staged.path) else { return }
+        try FileManager.default.removeItem(at: staged)
+    }
+
+    public func rollback() throws {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: staged.path) else { return }
+        guard !fm.fileExists(atPath: destination.path) else {
+            throw SkillportError.fileIO(
+                path: destination,
+                reason: "cannot restore staged removal because destination already exists"
+            )
+        }
+        try fm.moveItem(at: staged, to: destination)
+    }
+}
+
 public enum DirectoryReplacer {
     public static func replaceDirectory(
         at destination: URL,
@@ -60,5 +82,21 @@ public enum DirectoryReplacer {
             backup: parent.appendingPathComponent(finalBackupName, isDirectory: true),
             hadExistingDestination: true
         )
+    }
+
+    public static func stageRemoveDirectory(
+        at destination: URL,
+        stagedName: String? = nil
+    ) throws -> DirectoryRemoval? {
+        guard FileManager.default.fileExists(atPath: destination.path) else {
+            return nil
+        }
+
+        let parent = destination.deletingLastPathComponent()
+        let finalStagedName =
+            stagedName ?? ".\(destination.lastPathComponent).trash-\(UUID().uuidString)"
+        let staged = parent.appendingPathComponent(finalStagedName, isDirectory: true)
+        try FileManager.default.moveItem(at: destination, to: staged)
+        return DirectoryRemoval(destination: destination, staged: staged)
     }
 }

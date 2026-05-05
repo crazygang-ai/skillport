@@ -14,13 +14,20 @@ public actor SkillScannerActor {
         var byRealPath: [String: Skill] = [:]
 
         // Pass 1 — canonical store
-        if fm.fileExists(atPath: canonicalBase.path),
-            let entries = try? fm.contentsOfDirectory(
-                at: canonicalBase,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles]
-            )
-        {
+        if fm.fileExists(atPath: canonicalBase.path) {
+            let entries: [URL]
+            do {
+                entries = try fm.contentsOfDirectory(
+                    at: canonicalBase,
+                    includingPropertiesForKeys: [.isDirectoryKey],
+                    options: [.skipsHiddenFiles]
+                )
+            } catch {
+                throw SkillportError.fileIO(
+                    path: canonicalBase,
+                    reason: "failed to list canonical skills: \(error.localizedDescription)"
+                )
+            }
             for entry in entries {
                 guard fm.fileExists(atPath: entry.appendingPathComponent("SKILL.md").path) else { continue }
                 let key = entry.resolvingSymlinksInPath().path

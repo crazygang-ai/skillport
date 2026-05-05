@@ -2,6 +2,12 @@ import CryptoKit
 import Foundation
 
 public actor SkillUpdaterActor {
+    public struct PendingApply: Sendable {
+        public let skillFolderHash: String
+        fileprivate let replacement: DirectoryReplacement
+        fileprivate let cacheIdentity: SkillIdentity
+    }
+
     private let git: GitActor
     private let cache: CommitHashCache
     private let repoCache: RepoCacheActor
@@ -125,6 +131,36 @@ public actor SkillUpdaterActor {
         skillPath: String?,
         remoteURLOverride: URL?
     ) async throws -> String {
+        let pending = try await prepareApply(
+            name: name,
+            source: source,
+            canonical: canonical,
+            skillPath: skillPath,
+            remoteURLOverride: remoteURLOverride
+        )
+        await commit(pending)
+        return pending.skillFolderHash
+    }
+
+    public func prepareApply(
+        name: String,
+        source: SkillSource,
+        canonical: URL,
+        skillPath: String?
+    ) async throws -> PendingApply {
+        try await prepareApply(
+            name: name, source: source, canonical: canonical,
+            skillPath: skillPath, remoteURLOverride: nil
+        )
+    }
+
+    public func prepareApply(
+        name: String,
+        source: SkillSource,
+        canonical: URL,
+        skillPath: String?,
+        remoteURLOverride: URL?
+    ) async throws -> PendingApply {
         guard case .github(let owner, let repo, let ref) = source else {
             throw SkillportError.unexpected("apply() only supports github sources (got \(source))")
         }
@@ -169,13 +205,24 @@ public actor SkillUpdaterActor {
         do {
             let newHash = try await git.subdirTreeHash(in: cached, subdir: subdir, ref: "HEAD")
             let id = SkillIdentity.compute(name: name, source: source)
-            try? await cache.set(identity: id, hash: newHash)
-            try? replacement.commit()
-            return newHash
+            return PendingApply(
+                skillFolderHash: newHash,
+                replacement: replacement,
+                cacheIdentity: id
+            )
         } catch {
             try? replacement.rollback()
             throw error
         }
+    }
+
+    public func commit(_ pending: PendingApply) async {
+        try? await cache.set(identity: pending.cacheIdentity, hash: pending.skillFolderHash)
+        try? pending.replacement.commit()
+    }
+
+    public func rollback(_ pending: PendingApply) {
+        try? pending.replacement.rollback()
     }
 
     // MARK: - Internals

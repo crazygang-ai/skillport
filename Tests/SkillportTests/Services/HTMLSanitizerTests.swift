@@ -61,11 +61,13 @@ struct HTMLSanitizerTests {
         #expect(!image.contains("//evil.test"))
     }
 
-    @Test("src attributes allow http schemes only")
-    func srcAllowsHTTPSchemesOnly() throws {
-        let out = try sanitizer.sanitize(#"<img src="mailto:x@y.z" alt="x"><img src="tel:+1" alt="y">"#)
-        #expect(!out.contains("mailto:x@y.z"))
-        #expect(!out.contains("tel:+1"))
+    @Test("drops image tags so HTML preview cannot load remote resources")
+    func dropsImages() throws {
+        let out = try sanitizer.sanitize(#"<p>before</p><img src="https://a.com/i.png" alt="x"><p>after</p>"#)
+        #expect(out.contains("<p>before</p>"))
+        #expect(out.contains("<p>after</p>"))
+        #expect(!out.contains("<img"))
+        #expect(!out.contains("https://a.com/i.png"))
     }
 
     @Test("preserves https / mailto / tel / relative urls")
@@ -90,9 +92,4 @@ struct HTMLSanitizerTests {
         #expect(out.contains("noreferrer"))
     }
 
-    @Test("adds empty alt to images missing alt attribute")
-    func imgAltFilled() throws {
-        let out = try sanitizer.sanitize(#"<img src="https://a.com/i.png">"#)
-        #expect(out.contains("alt="))
-    }
 }

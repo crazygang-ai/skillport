@@ -85,6 +85,46 @@ struct DirectoryReplacerTests {
         #expect(!FileManager.default.fileExists(atPath: dest.path))
     }
 
+    @Test("stageRemoveDirectory moves destination aside until commit")
+    func stageRemoveCommit() throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let dest = try dir.mkdir("skill")
+        try "old".write(
+            to: dest.appendingPathComponent("SKILL.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let removal = try #require(try DirectoryReplacer.stageRemoveDirectory(at: dest))
+
+        #expect(!FileManager.default.fileExists(atPath: dest.path))
+        #expect(FileManager.default.fileExists(atPath: removal.staged.path))
+
+        try removal.commit()
+
+        #expect(!FileManager.default.fileExists(atPath: dest.path))
+        #expect(!FileManager.default.fileExists(atPath: removal.staged.path))
+    }
+
+    @Test("stageRemoveDirectory can roll back the staged removal")
+    func stageRemoveRollback() throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let dest = try dir.mkdir("skill")
+        try "old".write(
+            to: dest.appendingPathComponent("SKILL.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let removal = try #require(try DirectoryReplacer.stageRemoveDirectory(at: dest))
+        try removal.rollback()
+
+        #expect(try skillBody(at: dest) == "old")
+        #expect(!FileManager.default.fileExists(atPath: removal.staged.path))
+    }
+
     private func skillBody(at url: URL) throws -> String {
         try String(contentsOf: url.appendingPathComponent("SKILL.md"), encoding: .utf8)
     }

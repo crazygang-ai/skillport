@@ -47,6 +47,26 @@ struct SkillScannerActorTests {
         #expect(skills.isEmpty)
     }
 
+    @Test("Throws when canonical skills store cannot be listed")
+    func canonicalStoreListErrorThrows() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        try FileManager.default.createDirectory(
+            at: dir.url.appendingPathComponent(".agents"),
+            withIntermediateDirectories: true
+        )
+        try "not a directory".write(
+            to: dir.url.appendingPathComponent(".agents/skills"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let scanner = SkillScannerActor()
+        await #expect(throws: SkillportError.self) {
+            _ = try await scanner.scanAll(home: dir.url)
+        }
+    }
+
     @Test("Inherited fallback: codex sees .agents/skills entries without symlink")
     func inheritedFallback() async throws {
         let dir = try TempDir.create()

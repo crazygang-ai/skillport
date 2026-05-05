@@ -210,17 +210,20 @@ public actor SkillInstallerActor {
     /// Remove Skillport-managed symlinks, delete canonical files, drop lockfile entry.
     public func uninstall(name: String, home: URL) async throws {
         let canonical = home.appendingPathComponent(".agents/skills/\(name)")
-        let fm = FileManager.default
-        // 撤销所有 agent 下的安装——symlink 或 copy 都 handle。
+        let stagedRemoval = try DirectoryReplacer.stageRemoveDirectory(at: canonical)
+        do {
+            try await lockFile.remove(name: name)
+        } catch {
+            try? stagedRemoval?.rollback()
+            throw error
+        }
+
+        // lockfile 已成功删除后，再撤销所有 agent 下的安装——symlink 或 copy 都 handle。
         for agent in Agent.defaultAgents(home: home) {
             let link = agent.skillsDir.appendingPathComponent(name)
             try? await symlinker.removeInstallation(at: link, canonical: canonical)
         }
-        // Delete canonical files + drop lockfile entry.
-        if fm.fileExists(atPath: canonical.path) {
-            try fm.removeItem(at: canonical)
-        }
-        try await lockFile.remove(name: name)
+        try? stagedRemoval?.commit()
     }
 
     public func toggleAgent(name: String, agent: AgentID, install: Bool, home: URL) async throws {

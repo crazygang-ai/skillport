@@ -285,6 +285,53 @@ struct SkillUpdaterSubdirTests {
         #expect(!after.contains("junk"))
     }
 
+    @Test("prepareApply can roll back canonical before commit")
+    func prepareApplyRollbackRestoresCanonical() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let bareRepo = try GitFixtures.makeBareRepoWithSubSkills(
+            under: dir.url, subs: ["rollback"])
+
+        let cache = CommitHashCache(path: home.appendingPathComponent(".cache.json"))
+        let lockFile = LockFileActor(path: home.appendingPathComponent(".agents/.skill-lock.json"))
+        let repoCache = RepoCacheActor(
+            git: GitActor(), root: dir.url.appendingPathComponent("rc"))
+        let installer = SkillInstallerActor(
+            git: GitActor(), symlinker: SymlinkManagerActor(),
+            lockFile: lockFile, cache: cache, repoCache: repoCache
+        )
+        _ = try await installer.installGitHub(
+            sourceURL: bareRepo, owner: "t", repo: "example", ref: "HEAD",
+            skillId: "rollback", home: home, installTo: [])
+        let canonical = home.appendingPathComponent(".agents/skills/rollback")
+        try "local edit".write(
+            to: canonical.appendingPathComponent("SKILL.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let updater = SkillUpdaterActor(
+            git: GitActor(), cache: cache, repoCache: repoCache, lockFile: lockFile)
+        let pending = try await updater.prepareApply(
+            name: "rollback",
+            source: .github(owner: "t", repo: "example", ref: "HEAD"),
+            canonical: canonical,
+            skillPath: "skills/rollback",
+            remoteURLOverride: bareRepo
+        )
+
+        let staged = try String(
+            contentsOf: canonical.appendingPathComponent("SKILL.md"), encoding: .utf8)
+        #expect(staged.contains("# rollback"))
+
+        await updater.rollback(pending)
+
+        let restored = try String(
+            contentsOf: canonical.appendingPathComponent("SKILL.md"), encoding: .utf8)
+        #expect(restored == "local edit")
+    }
+
     @Test("apply rejects lockfile skillPath escaping cached repo")
     func applyRejectsEscapingSkillPath() async throws {
         let dir = try TempDir.create()

@@ -49,6 +49,23 @@ struct RegistrySidebar: View {
             if model.isLoading {
                 ProgressView().padding()
                 Spacer()
+            } else if let lastError = model.lastError {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label(
+                        String(localized: "Unable to load skills"),
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .font(.callout)
+                    Text(lastError)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                    Button(String(localized: "Retry")) {
+                        Task { await retry() }
+                    }
+                }
+                .padding()
+                Spacer()
             } else if model.skills.isEmpty {
                 Text(
                     model.searchInput.isEmpty
@@ -76,6 +93,14 @@ struct RegistrySidebar: View {
             }
         }
         .frame(minWidth: 300)
+    }
+
+    private func retry() async {
+        if model.searchInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            await model.loadLeaderboard()
+        } else {
+            await model.runSearchNow()
+        }
     }
 
     private func label(for c: LeaderboardCategory) -> String {

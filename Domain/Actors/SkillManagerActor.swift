@@ -227,7 +227,7 @@ public actor SkillManagerActor {
         guard let locked = lock.skills.first(where: { $0.name == name }) else {
             throw SkillportError.unexpected("no lockfile entry for '\(name)'")
         }
-        let newHash = try await updater.apply(
+        let pending = try await updater.prepareApply(
             name: name,
             source: locked.source,
             canonical: locked.path,
@@ -239,13 +239,19 @@ public actor SkillManagerActor {
             installedAt: locked.installedAt,
             commitHash: locked.commitHash,
             path: locked.path,
-            skillFolderHash: newHash,
+            skillFolderHash: pending.skillFolderHash,
             skillPath: locked.skillPath,
             updatedAt: Date(),
             dismissedUpdate: nil,
             lastSelectedAgents: locked.lastSelectedAgents
         )
-        try await lockFile.upsert(updated)
+        do {
+            try await lockFile.upsert(updated)
+        } catch {
+            await updater.rollback(pending)
+            throw error
+        }
+        await updater.commit(pending)
         let id = SkillIdentity.compute(name: name, source: locked.source)
         updateStatuses[id] = .upToDate
         eventsContinuation.yield(.skillUpdateStatusChanged(id: id, status: .upToDate))

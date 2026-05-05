@@ -5,14 +5,13 @@ public struct HTMLSanitizer {
     private static let allowedTags: Set<String> = [
         "p", "a", "ul", "ol", "li", "pre", "code", "blockquote",
         "strong", "em", "h1", "h2", "h3", "h4", "h5", "h6",
-        "img", "hr", "br", "table", "thead", "tbody", "tr", "th", "td",
+        "hr", "br", "table", "thead", "tbody", "tr", "th", "td",
     ]
     private static let allowedAttrs: Set<String> = [
-        "href", "src", "alt", "title", "target", "rel",
+        "href", "alt", "title", "target", "rel",
     ]
-    private static let urlAttrs: Set<String> = ["href", "src"]
+    private static let urlAttrs: Set<String> = ["href"]
     private static let safeHrefProtocols: Set<String> = ["http", "https", "mailto", "tel"]
-    private static let safeSrcProtocols: Set<String> = ["http", "https"]
 
     public init() {}
 
@@ -62,9 +61,6 @@ public struct HTMLSanitizer {
                 if tag == "a", el.hasAttr("href") {
                     try el.attr("rel", "noopener noreferrer")
                 }
-                if tag == "img", !el.hasAttr("alt") {
-                    try el.attr("alt", "")
-                }
             }
             return try body.html()
         } catch {
@@ -89,8 +85,6 @@ public struct HTMLSanitizer {
         switch attr {
         case "href":
             return safeHrefProtocols.contains(scheme)
-        case "src":
-            return safeSrcProtocols.contains(scheme)
         default:
             return false
         }
