@@ -7,6 +7,8 @@ public final class SkillsModel {
     public private(set) var skills: [Skill] = []
     public private(set) var agents: [Agent] = []
     public private(set) var isScanning: Bool = false
+    public private(set) var isDetectingAgents: Bool = false
+    public private(set) var hasDetectedAgents: Bool = false
 
     private let manager: SkillManagerActor
     private let detector: AgentDetector
@@ -73,34 +75,20 @@ public final class SkillsModel {
     public func refresh() async throws {
         isScanning = true
         defer { isScanning = false }
-        async let detected = try? detector.detectAllStatuses(home: home)
         let list = try await manager.rescan(home: home)
         skills = list
-        if let map = await detected {
-            agents = Agent.defaultAgents(home: home).map { a in
-                Agent(
-                    id: a.id,
-                    skillsDir: a.skillsDir,
-                    fallbackChain: a.fallbackChain,
-                    configDir: a.configDir,
-                    status: map[a.id] ?? .uninstalled
-                )
-            }
-        }
     }
 
     /// Re-probe which agent CLIs are on PATH without rescanning the filesystem.
     public func refreshAgents() async {
-        guard let map = try? await detector.detectAllStatuses(home: home) else { return }
-        agents = Agent.defaultAgents(home: home).map { a in
-            Agent(
-                id: a.id,
-                skillsDir: a.skillsDir,
-                fallbackChain: a.fallbackChain,
-                configDir: a.configDir,
-                status: map[a.id] ?? .uninstalled
-            )
+        guard !isDetectingAgents else { return }
+        isDetectingAgents = true
+        defer {
+            isDetectingAgents = false
+            hasDetectedAgents = true
         }
+        guard let map = try? await detector.detectAllStatuses(home: home) else { return }
+        agents = Self.agents(home: home, statuses: map)
     }
 
     public func startWatching() async {
@@ -147,5 +135,17 @@ public final class SkillsModel {
     private func applyUpdateStatus(id: SkillIdentity, status: UpdateStatus) {
         guard let index = skills.firstIndex(where: { $0.id == id }) else { return }
         skills[index].updateStatus = status
+    }
+
+    private static func agents(home: URL, statuses: [AgentID: AgentStatus]) -> [Agent] {
+        Agent.defaultAgents(home: home).map { a in
+            Agent(
+                id: a.id,
+                skillsDir: a.skillsDir,
+                fallbackChain: a.fallbackChain,
+                configDir: a.configDir,
+                status: statuses[a.id] ?? .uninstalled
+            )
+        }
     }
 }

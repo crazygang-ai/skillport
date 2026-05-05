@@ -32,7 +32,11 @@ struct SkillportApp: App {
                     lifecycleDelegate.shutdown = { [container] in
                         await container.shutdown()
                     }
-                    try? await container.skillsModel.refresh()
+                    async let refreshSkills: Void = {
+                        try? await container.skillsModel.refresh()
+                    }()
+                    async let refreshAgents: Void = container.skillsModel.refreshAgents()
+                    _ = await (refreshSkills, refreshAgents)
                     await container.skillsModel.startWatching()
                 }
                 .frame(minWidth: 900, minHeight: 600)

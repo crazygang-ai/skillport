@@ -39,8 +39,8 @@ struct SkillsModelTests {
         #expect(!after.installedAgents.contains(.kiro))
     }
 
-    @Test("refresh populates Agent.isInstalled via injected AgentDetector")
-    func refreshPopulatesIsInstalled() async throws {
+    @Test("refreshAgents populates Agent.isInstalled via injected AgentDetector")
+    func refreshAgentsPopulatesIsInstalled() async throws {
         let dir = try TempDir.create()
         defer { try? dir.cleanup() }
         // Fake bin dir containing only an executable named "codex".
@@ -56,7 +56,13 @@ struct SkillsModelTests {
             home: dir.url,
             detector: AgentDetector(pathOverride: bin.path)
         )
-        try await model.refresh()
+        #expect(model.hasDetectedAgents == false)
+        #expect(model.isDetectingAgents == false)
+
+        await model.refreshAgents()
+
+        #expect(model.hasDetectedAgents == true)
+        #expect(model.isDetectingAgents == false)
         let byID = Dictionary(uniqueKeysWithValues: model.agents.map { ($0.id, $0) })
         #expect(byID[.codex]?.isInstalled == true)
         #expect(byID[.claudeCode]?.isInstalled == false)

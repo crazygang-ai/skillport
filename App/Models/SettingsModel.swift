@@ -27,13 +27,9 @@ public final class SettingsModel {
         self.keychain = keychain
         self.defaults = defaults
 
-        if let arr = defaults.array(forKey: Self.appleLanguagesKey) as? [String],
-            let first = arr.first, !first.isEmpty
-        {
-            self.preferredLocale = first
-        } else {
-            self.preferredLocale = "en"
-        }
+        let rawLocale =
+            (defaults.array(forKey: Self.appleLanguagesKey) as? [String])?.first ?? "en"
+        self.preferredLocale = Self.normalizedLocale(rawLocale)
 
         if defaults.object(forKey: Self.autoCheckKey) == nil {
             self.autoCheckUpdates = true
@@ -55,11 +51,31 @@ public final class SettingsModel {
     }
 
     public func setPreferredLocale(_ locale: String) {
-        preferredLocale = locale
+        let normalized = Self.normalizedLocale(locale)
+        preferredLocale = normalized
         var current = defaults.array(forKey: Self.appleLanguagesKey) as? [String] ?? []
-        current.removeAll { $0 == locale }
-        current.insert(locale, at: 0)
+        current.removeAll { Self.normalizedLocale($0) == normalized }
+        current.insert(normalized, at: 0)
         defaults.set(current, forKey: Self.appleLanguagesKey)
+    }
+
+    public static func normalizedLocale(_ locale: String) -> String {
+        let normalized =
+            locale
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "_", with: "-")
+            .lowercased()
+        if normalized.hasPrefix("zh-hans") || normalized.hasPrefix("zh-cn") {
+            return "zh-Hans"
+        }
+        if normalized.hasPrefix("zh-hant") || normalized.hasPrefix("zh-tw")
+            || normalized.hasPrefix("zh-hk") || normalized.hasPrefix("zh-mo")
+        {
+            return "zh-Hant"
+        }
+        if normalized.hasPrefix("ja") { return "ja" }
+        if normalized.hasPrefix("en") { return "en" }
+        return "en"
     }
 
     public func setProxyPassword(_ password: String) async throws {

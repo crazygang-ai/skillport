@@ -47,6 +47,34 @@ struct SettingsModelM6Tests {
         defaults.removePersistentDomain(forName: suite)
     }
 
+    @Test("preferredLocale normalizes regional AppleLanguages code")
+    func localeNormalizesRegionalCode() async {
+        let suite = "test-\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.set(["zh-Hans-US", "en-US"], forKey: "AppleLanguages")
+        let model = SettingsModel(
+            proxyActor: ProxySettingsActor(suiteName: nil),
+            keychain: KeychainActor(service: "skillport-test-\(UUID())"),
+            defaults: defaults
+        )
+        #expect(model.preferredLocale == "zh-Hans")
+        defaults.removePersistentDomain(forName: suite)
+    }
+
+    @Test("preferredLocale falls back to English for unsupported AppleLanguages code")
+    func localeFallsBackForUnsupportedCode() async {
+        let suite = "test-\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.set(["fr-FR"], forKey: "AppleLanguages")
+        let model = SettingsModel(
+            proxyActor: ProxySettingsActor(suiteName: nil),
+            keychain: KeychainActor(service: "skillport-test-\(UUID())"),
+            defaults: defaults
+        )
+        #expect(model.preferredLocale == "en")
+        defaults.removePersistentDomain(forName: suite)
+    }
+
     @Test("setPreferredLocale writes AppleLanguages array into UserDefaults")
     func persistLocale() async {
         let suite = "test-\(UUID())"

@@ -14,9 +14,18 @@ struct SidebarView: View {
             }
 
             Section(String(localized: "Filter by agent")) {
-                ForEach(skillsModel.agents.filter(\.isInstalled), id: \.id) { agent in
-                    Label(agent.id.displayName, systemImage: "cube")
-                        .tag(SidebarSelection.agent(agent.id))
+                let installedAgents = skillsModel.agents.filter(\.isInstalled)
+                if skillsModel.isDetectingAgents || !skillsModel.hasDetectedAgents {
+                    Label(String(localized: "Detecting agents..."), systemImage: "hourglass")
+                        .foregroundStyle(.secondary)
+                } else if installedAgents.isEmpty {
+                    Label(String(localized: "No agents detected"), systemImage: "questionmark.circle")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(installedAgents, id: \.id) { agent in
+                        Label(agent.id.displayName, systemImage: "cube")
+                            .tag(SidebarSelection.agent(agent.id))
+                    }
                 }
             }
         }
