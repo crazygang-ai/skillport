@@ -56,11 +56,14 @@ jobs:
             DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM"
 
       - name: Export .app
+        env:
+          DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
         run: |
+          ./Scripts/prepare-export-options.sh build/ExportOptions.generated.plist
           xcodebuild -exportArchive \
             -archivePath build/Skillport.xcarchive \
             -exportPath build/export \
-            -exportOptionsPlist build/ExportOptions.plist
+            -exportOptionsPlist build/ExportOptions.generated.plist
 
       - name: Notarize
         env:

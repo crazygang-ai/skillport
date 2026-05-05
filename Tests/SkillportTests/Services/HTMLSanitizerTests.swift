@@ -53,6 +53,21 @@ struct HTMLSanitizerTests {
         #expect(!out.lowercased().contains("data:text"))
     }
 
+    @Test("drops protocol-relative urls")
+    func dropsProtocolRelativeURL() throws {
+        let link = try sanitizer.sanitize(#"<a href="//evil.test/path">x</a>"#)
+        let image = try sanitizer.sanitize(#"<img src="//evil.test/a.png" alt="x">"#)
+        #expect(!link.contains("//evil.test"))
+        #expect(!image.contains("//evil.test"))
+    }
+
+    @Test("src attributes allow http schemes only")
+    func srcAllowsHTTPSchemesOnly() throws {
+        let out = try sanitizer.sanitize(#"<img src="mailto:x@y.z" alt="x"><img src="tel:+1" alt="y">"#)
+        #expect(!out.contains("mailto:x@y.z"))
+        #expect(!out.contains("tel:+1"))
+    }
+
     @Test("preserves https / mailto / tel / relative urls")
     func preservesSafeUrls() throws {
         let cases: [(String, String)] = [

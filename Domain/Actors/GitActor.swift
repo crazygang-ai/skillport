@@ -3,10 +3,22 @@ import Foundation
 public actor GitActor {
     private let proxySettings: ProxySettingsActor?
     private let keychain: KeychainActor?
+    private let executableURL: URL
+    private let commandPrefix: [String]
+    private let commandTimeout: Duration
 
-    public init(proxySettings: ProxySettingsActor? = nil, keychain: KeychainActor? = nil) {
+    public init(
+        proxySettings: ProxySettingsActor? = nil,
+        keychain: KeychainActor? = nil,
+        executableURL: URL = URL(fileURLWithPath: "/usr/bin/env"),
+        commandPrefix: [String] = ["git"],
+        commandTimeout: Duration = .seconds(120)
+    ) {
         self.proxySettings = proxySettings
         self.keychain = keychain
+        self.executableURL = executableURL
+        self.commandPrefix = commandPrefix
+        self.commandTimeout = commandTimeout
     }
 
     @discardableResult
@@ -79,10 +91,63 @@ public actor GitActor {
 
     private func run(_ args: [String], in cwd: URL?) async throws -> String {
         let environment = await processEnvironment()
-        return try await withCheckedThrowingContinuation { continuation in
+        let executableURL = executableURL
+        let commandPrefix = commandPrefix
+        let timeout = commandTimeout
+        let box = GitProcessBox()
+
+        return try await withTaskCancellationHandler(
+            operation: {
+                try await withThrowingTaskGroup(of: String.self) { group in
+                    group.addTask {
+                        try await Self.runProcess(
+                            args,
+                            in: cwd,
+                            environment: environment,
+                            executableURL: executableURL,
+                            commandPrefix: commandPrefix,
+                            processBox: box
+                        )
+                    }
+                    group.addTask {
+                        try await Task.sleep(for: timeout)
+                        box.terminate()
+                        throw SkillportError.gitFailed(
+                            exitCode: -2,
+                            stderr: "git timed out after \(timeout)"
+                        )
+                    }
+
+                    do {
+                        guard let output = try await group.next() else {
+                            throw SkillportError.gitFailed(exitCode: -1, stderr: "git task did not start")
+                        }
+                        group.cancelAll()
+                        return output
+                    } catch {
+                        group.cancelAll()
+                        throw error
+                    }
+                }
+            },
+            onCancel: {
+                box.terminate()
+            }
+        )
+    }
+
+    private nonisolated static func runProcess(
+        _ args: [String],
+        in cwd: URL?,
+        environment: [String: String],
+        executableURL: URL,
+        commandPrefix: [String],
+        processBox: GitProcessBox
+    ) async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
             let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = ["git"] + args
+            process.executableURL = executableURL
+            process.arguments = commandPrefix + args
             if let cwd { process.currentDirectoryURL = cwd }
             if !environment.isEmpty {
                 process.environment = environment
@@ -121,6 +186,7 @@ public actor GitActor {
                 if let restErr { sink.appendStderr(restErr) }
                 stdout.fileHandleForReading.readabilityHandler = nil
                 stderr.fileHandleForReading.readabilityHandler = nil
+                processBox.clear(proc)
 
                 if proc.terminationStatus == 0 {
                     continuation.resume(returning: sink.stdoutString())
@@ -135,8 +201,10 @@ public actor GitActor {
             }
 
             do {
+                processBox.set(process)
                 try process.run()
             } catch {
+                processBox.clear(process)
                 stdout.fileHandleForReading.readabilityHandler = nil
                 stderr.fileHandleForReading.readabilityHandler = nil
                 process.terminationHandler = nil
@@ -191,5 +259,32 @@ private final class PipeSink: @unchecked Sendable {
     func stderrString() -> String {
         lock.lock(); defer { lock.unlock() }
         return String(data: stderrData, encoding: .utf8) ?? ""
+    }
+}
+
+private final class GitProcessBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var process: Process?
+
+    func set(_ process: Process) {
+        lock.lock()
+        self.process = process
+        lock.unlock()
+    }
+
+    func clear(_ process: Process) {
+        lock.lock()
+        if self.process === process {
+            self.process = nil
+        }
+        lock.unlock()
+    }
+
+    func terminate() {
+        lock.lock()
+        let process = self.process
+        lock.unlock()
+        guard let process, process.isRunning else { return }
+        process.terminate()
     }
 }

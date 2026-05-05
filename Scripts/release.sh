@@ -49,11 +49,13 @@ xcodebuild archive \
 
 # 5. Export .app
 EXPORT_DIR="$REPO_ROOT/build/export-$VERSION"
+EXPORT_OPTIONS="$REPO_ROOT/build/ExportOptions.generated.plist"
 mkdir -p "$EXPORT_DIR"
+./Scripts/prepare-export-options.sh "$EXPORT_OPTIONS"
 xcodebuild -exportArchive \
     -archivePath "$ARCHIVE_PATH" \
     -exportPath "$EXPORT_DIR" \
-    -exportOptionsPlist build/ExportOptions.plist
+    -exportOptionsPlist "$EXPORT_OPTIONS"
 
 # 6. Commit + tag
 git add project.yml

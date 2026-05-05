@@ -88,6 +88,50 @@ struct GitActorTests {
                 atPath: dest.appendingPathComponent("README.md").path))
     }
 
+    @Test("command timeout terminates long-running git process")
+    func commandTimeoutTerminatesProcess() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let fakeGit = try makeSleepingGit(in: dir)
+        let git = GitActor(
+            executableURL: fakeGit,
+            commandPrefix: [],
+            commandTimeout: .milliseconds(100)
+        )
+
+        let start = Date()
+        await #expect(throws: SkillportError.self) {
+            _ = try await git.headHash(in: dir.url)
+        }
+        #expect(Date().timeIntervalSince(start) < 0.8)
+    }
+
+    @Test("task cancellation terminates long-running git process")
+    func cancellationTerminatesProcess() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let fakeGit = try makeSleepingGit(in: dir)
+        let git = GitActor(
+            executableURL: fakeGit,
+            commandPrefix: [],
+            commandTimeout: .seconds(10)
+        )
+
+        let task = Task {
+            try await git.headHash(in: dir.url)
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        let start = Date()
+        task.cancel()
+        do {
+            _ = try await task.value
+            Issue.record("expected cancellation to fail the git command")
+        } catch {
+            // Expected: either cancellation or the terminated process error.
+        }
+        #expect(Date().timeIntervalSince(start) < 0.8)
+    }
+
     @Test("subdirTreeHash returns subdir hash that changes when subdir content changes")
     func subdirTreeHashTracksSubdir() async throws {
         let dir = try TempDir.create()
@@ -149,5 +193,19 @@ struct GitActorTests {
             .effectiveProxyEnvironmentForTesting(password: "secret")
         #expect(env["ALL_PROXY"] == "socks5://alice:secret@127.0.0.1:1080")
         #expect(env["NO_PROXY"] == "localhost")
+    }
+
+    private func makeSleepingGit(in dir: TempDir) throws -> URL {
+        let fakeGit = dir.url.appendingPathComponent("fake-git")
+        try "#!/bin/sh\nsleep 1\necho should-not-complete\n".write(
+            to: fakeGit,
+            atomically: true,
+            encoding: .utf8
+        )
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: fakeGit.path
+        )
+        return fakeGit
     }
 }

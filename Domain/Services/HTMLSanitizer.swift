@@ -11,7 +11,8 @@ public struct HTMLSanitizer {
         "href", "src", "alt", "title", "target", "rel",
     ]
     private static let urlAttrs: Set<String> = ["href", "src"]
-    private static let safeProtocols: Set<String> = ["http", "https", "mailto", "tel"]
+    private static let safeHrefProtocols: Set<String> = ["http", "https", "mailto", "tel"]
+    private static let safeSrcProtocols: Set<String> = ["http", "https"]
 
     public init() {}
 
@@ -53,7 +54,7 @@ public struct HTMLSanitizer {
                     }
                     if Self.urlAttrs.contains(lowerKey) {
                         let val = try el.attr(key)
-                        if !Self.isSafeURL(val) {
+                        if !Self.isSafeURL(val, attr: lowerKey) {
                             try el.removeAttr(key)
                         }
                     }
@@ -71,9 +72,10 @@ public struct HTMLSanitizer {
         }
     }
 
-    private static func isSafeURL(_ value: String) -> Bool {
+    private static func isSafeURL(_ value: String, attr: String) -> Bool {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
+        if trimmed.hasPrefix("//") { return false }
         if trimmed.hasPrefix("#") || trimmed.hasPrefix("/")
             || trimmed.hasPrefix("./") || trimmed.hasPrefix("../")
         {
@@ -84,6 +86,13 @@ public struct HTMLSanitizer {
         else {
             return false
         }
-        return safeProtocols.contains(scheme)
+        switch attr {
+        case "href":
+            return safeHrefProtocols.contains(scheme)
+        case "src":
+            return safeSrcProtocols.contains(scheme)
+        default:
+            return false
+        }
     }
 }
