@@ -819,6 +819,34 @@
         }
       }
     },
+    "Install to Skillport" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Install to Skillport"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skillport にインストール"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装到 Skillport"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安裝到 Skillport"
+          }
+        }
+      }
+    },
     "Installed %@" : {
       "extractionState" : "stale",
       "localizations" : {

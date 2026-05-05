@@ -68,6 +68,31 @@ enum GitFixtures {
         return bareURL
     }
 
+    /// 造一个 bare repo，根目录和 `skills/<sub>/` 同时有 SKILL.md。
+    static func makeBareRepoWithRootAndSubSkills(under home: URL, subs: [String]) throws -> URL {
+        let workDir = home.appendingPathComponent("repo-work-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
+        try "---\ndescription: root\n---\n# Root\n".write(
+            to: workDir.appendingPathComponent("SKILL.md"), atomically: true, encoding: .utf8)
+        for sub in subs {
+            let dir = workDir.appendingPathComponent("skills/\(sub)")
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try "---\ndescription: \(sub)\n---\n# \(sub)\n".write(
+                to: dir.appendingPathComponent("SKILL.md"), atomically: true, encoding: .utf8)
+        }
+        try runGit(in: workDir, ["init", "-b", "main"])
+        try runGit(in: workDir, ["add", "."])
+        try runGit(
+            in: workDir,
+            [
+                "-c", "user.name=t", "-c", "user.email=t@t.t",
+                "commit", "-m", "init",
+            ])
+        let bareURL = home.appendingPathComponent("bare-\(UUID().uuidString).git")
+        try runGit(in: workDir, ["clone", "--bare", ".", bareURL.path])
+        return bareURL
+    }
+
     private static func runGit(in dir: URL, _ args: [String]) throws {
         let p = Process()
         p.currentDirectoryURL = dir

@@ -2,9 +2,20 @@ import Foundation
 
 public struct AgentDetector: Sendable {
     private let pathOverride: String?
+    private let shellOverride: String?
+    private let fallbackPathOverride: String?
+    private let loginShellTimeout: Duration
 
-    public init(pathOverride: String? = nil) {
+    public init(
+        pathOverride: String? = nil,
+        shellOverride: String? = nil,
+        fallbackPathOverride: String? = nil,
+        loginShellTimeout: Duration = .seconds(3)
+    ) {
         self.pathOverride = pathOverride
+        self.shellOverride = shellOverride
+        self.fallbackPathOverride = fallbackPathOverride
+        self.loginShellTimeout = loginShellTimeout
     }
 
     public func isInstalled(agentID: AgentID) async throws -> Bool {
@@ -85,12 +96,34 @@ public struct AgentDetector: Sendable {
         if let loginPath = await loginShellPath(), !loginPath.isEmpty {
             return loginPath
         }
-        return ProcessInfo.processInfo.environment["PATH"] ?? ""
+        return fallbackPathOverride ?? ProcessInfo.processInfo.environment["PATH"] ?? ""
     }
 
     private func loginShellPath() async -> String? {
-        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        return await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
+        let shell = shellOverride ?? ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let timeout = loginShellTimeout
+        let box = LoginShellProcessBox()
+        return await withTaskGroup(of: String?.self) { group in
+            group.addTask {
+                await Self.runLoginShellPath(shell: shell, processBox: box)
+            }
+            group.addTask {
+                try? await Task.sleep(for: timeout)
+                box.terminate()
+                return nil
+            }
+            let result = await group.next() ?? nil
+            group.cancelAll()
+            box.terminate()
+            return result
+        }
+    }
+
+    private static func runLoginShellPath(
+        shell: String,
+        processBox: LoginShellProcessBox
+    ) async -> String? {
+        await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
             let p = Process()
             p.executableURL = URL(fileURLWithPath: shell)
             // `-ilc` runs an interactive login shell so both `.zprofile` and `.zshrc`
@@ -98,23 +131,94 @@ public struct AgentDetector: Sendable {
             // `printf` avoids trailing-newline quirks.
             p.arguments = ["-ilc", "printf %s \"$PATH\""]
             let out = Pipe()
+            let err = Pipe()
+            let sink = LoginShellPipeSink()
             p.standardOutput = out
-            p.standardError = Pipe()
+            p.standardError = err
+            out.fileHandleForReading.readabilityHandler = { handle in
+                let data = handle.availableData
+                if data.isEmpty {
+                    handle.readabilityHandler = nil
+                } else {
+                    sink.appendStdout(data)
+                }
+            }
+            err.fileHandleForReading.readabilityHandler = { handle in
+                let data = handle.availableData
+                if data.isEmpty {
+                    handle.readabilityHandler = nil
+                } else {
+                    sink.appendStderr(data)
+                }
+            }
             p.terminationHandler = { _ in
-                let data = (try? out.fileHandleForReading.readToEnd()) ?? nil ?? Data()
-                let s = String(data: data, encoding: .utf8)?
+                let restOut = try? out.fileHandleForReading.readToEnd()
+                let restErr = try? err.fileHandleForReading.readToEnd()
+                if let restOut { sink.appendStdout(restOut) }
+                if let restErr { sink.appendStderr(restErr) }
+                out.fileHandleForReading.readabilityHandler = nil
+                err.fileHandleForReading.readabilityHandler = nil
+                let s = sink.stdoutString()
                     .trimmingCharacters(in: .whitespacesAndNewlines)
-                if let s, !s.isEmpty {
+                if !s.isEmpty {
                     continuation.resume(returning: s)
                 } else {
                     continuation.resume(returning: nil)
                 }
             }
             do {
+                processBox.set(p)
                 try p.run()
             } catch {
+                out.fileHandleForReading.readabilityHandler = nil
+                err.fileHandleForReading.readabilityHandler = nil
+                p.terminationHandler = nil
                 continuation.resume(returning: nil)
             }
         }
+    }
+}
+
+private final class LoginShellProcessBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var process: Process?
+
+    func set(_ process: Process) {
+        lock.lock()
+        self.process = process
+        lock.unlock()
+    }
+
+    func terminate() {
+        lock.lock()
+        let process = self.process
+        lock.unlock()
+        if process?.isRunning == true {
+            process?.terminate()
+        }
+    }
+}
+
+private final class LoginShellPipeSink: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stdoutData = Data()
+    private var stderrData = Data()
+
+    func appendStdout(_ data: Data) {
+        lock.lock()
+        stdoutData.append(data)
+        lock.unlock()
+    }
+
+    func appendStderr(_ data: Data) {
+        lock.lock()
+        stderrData.append(data)
+        lock.unlock()
+    }
+
+    func stdoutString() -> String {
+        lock.lock()
+        defer { lock.unlock() }
+        return String(data: stdoutData, encoding: .utf8) ?? ""
     }
 }

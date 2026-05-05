@@ -275,7 +275,8 @@ public actor SkillInstallerActor {
         )
     }
 
-    /// 深度优先扫描 repo，返回所有含 `SKILL.md` 的目录。命中后不再深入。
+    /// 深度优先扫描 repo，返回所有含 `SKILL.md` 的目录。
+    /// 即使当前目录已是一个 skill，也继续向下扫描，支持 root skill + subskills 共存的 repo。
     /// 跳过 `.git` / `node_modules` / `__MACOSX` / 除白名单外的 dotfile 目录。
     static func findSkillDirs(root: URL, maxDepth: Int = 5) -> [URL] {
         var result: [URL] = []
@@ -289,7 +290,6 @@ public actor SkillInstallerActor {
             if depth > maxDepth { return }
             if fm.fileExists(atPath: dir.appendingPathComponent("SKILL.md").path) {
                 result.append(dir)
-                return
             }
             guard
                 let entries = try? fm.contentsOfDirectory(

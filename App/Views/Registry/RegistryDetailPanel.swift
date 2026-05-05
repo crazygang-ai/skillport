@@ -96,12 +96,15 @@ struct RegistryDetailPanel: View {
             } label: {
                 HStack {
                     Spacer()
-                    Text(String(localized: "Install"))
+                    Text(
+                        model.selectedAgentsForInstall.isEmpty
+                            ? String(localized: "Install to Skillport")
+                            : String(localized: "Install")
+                    )
                     Spacer()
                 }
                 .padding(.vertical, 6)
             }
-            .disabled(model.selectedAgentsForInstall.isEmpty)
             .buttonStyle(.borderedProminent)
         }
         .padding()

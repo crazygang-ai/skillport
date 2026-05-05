@@ -240,6 +240,29 @@ struct SkillInstallerMultiSkillTests {
         #expect(!FileManager.default.fileExists(atPath: sub2.path))
     }
 
+    @Test("installGitHub can extract subdir when repo root also has SKILL.md")
+    func multiSkillSubdirExtractionWithRootSkill() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let bareRepo = try GitFixtures.makeBareRepoWithRootAndSubSkills(
+            under: dir.url, subs: ["pilot", "scout"])
+
+        let installer = makeInstaller(home: home)
+        let skill = try await installer.installGitHub(
+            sourceURL: bareRepo,
+            owner: "test", repo: "example", ref: "HEAD",
+            skillId: "pilot",
+            home: home, installTo: []
+        )
+
+        #expect(skill.name == "pilot")
+        let pilot = home.appendingPathComponent(".agents/skills/pilot")
+        #expect(FileManager.default.fileExists(atPath: pilot.appendingPathComponent("SKILL.md").path))
+        let root = home.appendingPathComponent(".agents/skills/example")
+        #expect(!FileManager.default.fileExists(atPath: root.path))
+    }
+
     @Test("installGitHub with non-existent skillId throws")
     func multiSkillMissingSubdir() async throws {
         let dir = try TempDir.create()

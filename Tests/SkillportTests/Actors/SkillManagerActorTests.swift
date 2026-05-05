@@ -93,6 +93,46 @@ struct SkillManagerActorTests {
         #expect(after.first?.updateStatus == .available(remoteHash: "remote-alpha"))
     }
 
+    @Test("rescan merges lockfile source only with matching canonical path")
+    func rescanMergesLockfileSourceByPath() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let canonical = try AgentsFS.createCanonicalSkill(in: dir.url, name: "same")
+        let foreign = try AgentsFS.createForeignSkill(
+            in: dir.url,
+            agentRelativeSkillsDir: ".claude/skills",
+            name: "same"
+        )
+        let lockPath = dir.url.appendingPathComponent(".agents/.skill-lock.json")
+        let lockFile = LockFileActor(path: lockPath)
+        let githubSource = SkillSource.github(owner: "owner", repo: "repo", ref: "main")
+        try await lockFile.upsert(
+            LockedSkill(
+                name: "same",
+                source: githubSource,
+                installedAt: Date(),
+                commitHash: "abc",
+                path: canonical
+            )
+        )
+
+        let manager = makeManager(home: dir.url)
+        let skills = try await manager.rescan(home: dir.url)
+        let byPath = Dictionary(
+            uniqueKeysWithValues: skills.map {
+                ($0.path.resolvingSymlinksInPath().path, $0)
+            }
+        )
+
+        #expect(skills.count == 2)
+        #expect(byPath[canonical.resolvingSymlinksInPath().path]?.source == githubSource)
+        #expect(
+            byPath[foreign.resolvingSymlinksInPath().path]?.source
+                == .local(path: foreign)
+        )
+        #expect(Set(skills.map(\.id)).count == 2)
+    }
+
     private func makeManager(
         home: URL,
         checkStatus: (@Sendable (Skill) async throws -> UpdateStatus)? = nil

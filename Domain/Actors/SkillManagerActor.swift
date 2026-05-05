@@ -60,11 +60,12 @@ public actor SkillManagerActor {
             )
             lock = LockFile(skills: [])
         }
-        let sourceByName: [String: SkillSource] = Dictionary(
-            uniqueKeysWithValues: lock.skills.map { ($0.name, $0.source) }
-        )
+        var sourceByResolvedPath: [String: SkillSource] = [:]
+        for locked in lock.skills {
+            sourceByResolvedPath[locked.path.resolvingSymlinksInPath().path] = locked.source
+        }
         let merged: [Skill] = scanned.map { s in
-            let realSource = sourceByName[s.name] ?? s.source
+            let realSource = sourceByResolvedPath[s.path.resolvingSymlinksInPath().path] ?? s.source
             let id = SkillIdentity.compute(name: s.name, source: realSource)
             let updateStatus = updateStatuses[id] ?? s.updateStatus
             return Skill(

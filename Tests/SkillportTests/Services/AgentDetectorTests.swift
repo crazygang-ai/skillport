@@ -97,4 +97,29 @@ struct AgentDetectorTests {
         #expect(map[.claudeCode]?.skillsDirExists == true)
         #expect(map[.claudeCode]?.skillCount == 2)
     }
+
+    @Test("falls back to process PATH when login shell times out")
+    func loginShellTimeoutFallsBackToPath() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let bin = try dir.mkdir("bin")
+        let fakeClaude = bin.appendingPathComponent("claude")
+        try "#!/bin/sh\nexit 0\n".write(to: fakeClaude, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755], ofItemAtPath: fakeClaude.path)
+
+        let sleeper = dir.url.appendingPathComponent("slow-shell")
+        try "#!/bin/sh\nsleep 5\n".write(to: sleeper, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755], ofItemAtPath: sleeper.path)
+
+        let detector = AgentDetector(
+            shellOverride: sleeper.path,
+            fallbackPathOverride: bin.path,
+            loginShellTimeout: .milliseconds(100)
+        )
+
+        let installed = try await detector.isInstalled(agentID: .claudeCode)
+        #expect(installed == true)
+    }
 }

@@ -34,7 +34,7 @@ public final class AppContainer {
             git: git,
             root: repoCacheRoot
                 ?? FileManager.default.temporaryDirectory
-                    .appendingPathComponent("skillport-repos", isDirectory: true)
+                .appendingPathComponent("skillport-repos", isDirectory: true)
         )
         self.repoCache = repoCache
         let installer = SkillInstallerActor(

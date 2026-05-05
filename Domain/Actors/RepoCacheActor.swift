@@ -1,5 +1,5 @@
-import Foundation
 import CryptoKit
+import Foundation
 
 /// 为同一个 `(url, ref)` 维护共享 shallow clone 目录，供 Installer（多 skill 扫描）
 /// 与 Updater（算远端 subdir tree hash）复用，并合并并发调用。
