@@ -128,7 +128,6 @@ public actor SkillInstallerActor {
         let dest = canonicalBase.appendingPathComponent(storageName, isDirectory: true)
         let suffix = UUID().uuidString
         let tmp = canonicalBase.appendingPathComponent(".\(storageName).tmp-\(suffix)", isDirectory: true)
-        let backup = canonicalBase.appendingPathComponent(".\(storageName).bak-\(suffix)", isDirectory: true)
 
         // 复制到 staging（去掉 `.git` 避免把 repo 历史带进 skill 目录）。失败时旧 canonical 不动。
         do {
@@ -165,17 +164,10 @@ public actor SkillInstallerActor {
             ?? ""
         let parsed = (try? SKILLMdParser.parse(raw)) ?? .init(metadata: SKILLMetadata(), body: raw)
 
-        let canonicalExisted = fm.fileExists(atPath: dest.path)
+        let replacement: DirectoryReplacement
         do {
-            if canonicalExisted {
-                try fm.moveItem(at: dest, to: backup)
-            }
-            try fm.moveItem(at: tmp, to: dest)
+            replacement = try DirectoryReplacer.replaceDirectory(at: dest, withStagedDirectory: tmp)
         } catch {
-            if canonicalExisted, fm.fileExists(atPath: backup.path) {
-                try? fm.removeItem(at: dest)
-                try? fm.moveItem(at: backup, to: dest)
-            }
             try? fm.removeItem(at: tmp)
             throw error
         }
@@ -195,18 +187,11 @@ public actor SkillInstallerActor {
                     try? await symlinker.removeInstallation(at: link, canonical: dest)
                 }
             }
-            if canonicalExisted, fm.fileExists(atPath: backup.path) {
-                try? fm.removeItem(at: dest)
-                try? fm.moveItem(at: backup, to: dest)
-            } else {
-                try? fm.removeItem(at: dest)
-            }
+            try? replacement.rollback()
             throw error
         }
 
-        if fm.fileExists(atPath: backup.path) {
-            try? fm.removeItem(at: backup)
-        }
+        try? replacement.commit()
         if let folderHash {
             try? await cache.set(identity: identity, hash: folderHash)
         } else if let commitHash {

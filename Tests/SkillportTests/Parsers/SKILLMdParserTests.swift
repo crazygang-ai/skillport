@@ -24,6 +24,8 @@ struct SKILLMdParserTests {
         let result = try SKILLMdParser.parse(raw)
         #expect(result.metadata.name == "Just body")
         #expect(result.metadata.description == "No frontmatter at all.")
+        #expect(result.persistedMetadata.name == nil)
+        #expect(result.persistedMetadata.description == nil)
         // body 保持完整（含标题），原文不被吞。
         #expect(result.body.hasPrefix("# Just body"))
     }
@@ -35,6 +37,8 @@ struct SKILLMdParserTests {
         #expect(result.metadata.description == "from-yaml")
         // name 在 frontmatter 里没写，应从 body fallback
         #expect(result.metadata.name == "Heading")
+        #expect(result.persistedMetadata.description == "from-yaml")
+        #expect(result.persistedMetadata.name == nil)
     }
 
     @Test("Parser reads name/license/author/version from frontmatter")

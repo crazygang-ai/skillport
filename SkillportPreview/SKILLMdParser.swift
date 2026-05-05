@@ -5,13 +5,28 @@ import Foundation
 public enum SKILLMdParser {
     public struct ParseResult: Sendable {
         public let metadata: SKILLMetadata
+        public let persistedMetadata: SKILLMetadata
         public let body: String
+
+        public init(
+            metadata: SKILLMetadata,
+            persistedMetadata: SKILLMetadata? = nil,
+            body: String
+        ) {
+            self.metadata = metadata
+            self.persistedMetadata = persistedMetadata ?? metadata
+            self.body = body
+        }
     }
 
     public static func parse(_ raw: String) throws -> ParseResult {
         guard raw.hasPrefix("---\n") || raw.hasPrefix("---\r\n") else {
             // 无 frontmatter — 从 body 的第一个 `# Heading` + 首段 fallback 提取 name/description。
-            return ParseResult(metadata: metadataFromMarkdown(raw), body: raw)
+            return ParseResult(
+                metadata: metadataFromMarkdown(raw),
+                persistedMetadata: SKILLMetadata(),
+                body: raw
+            )
         }
         // 查找关闭行（独占一行的 "---"）
         let lines = raw.split(separator: "\n", omittingEmptySubsequences: false)
@@ -35,6 +50,7 @@ public enum SKILLMdParser {
         } catch {
             throw SkillportError.parseFailed(reason: "invalid YAML: \(error)")
         }
+        let persistedMetadata = metadata
         // 若 frontmatter 未写 name/description，从 markdown body fallback 补齐。
         if metadata.name == nil || metadata.description == nil {
             let bodyFallback = metadataFromMarkdown(body)
@@ -43,7 +59,11 @@ public enum SKILLMdParser {
         }
         // 去掉 body 开头可能的单个换行
         let trimmedBody = body.hasPrefix("\n") ? String(body.dropFirst()) : body
-        return ParseResult(metadata: metadata, body: trimmedBody)
+        return ParseResult(
+            metadata: metadata,
+            persistedMetadata: persistedMetadata,
+            body: trimmedBody
+        )
     }
 
     /// 从纯 markdown（无 frontmatter）提取 name 与 description：

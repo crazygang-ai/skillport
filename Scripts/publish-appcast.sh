@@ -29,10 +29,11 @@ hdiutil create -volname "Skillport" -srcfolder "$APP_PATH" -ov -format UDZO "$DM
 SIGN_TOOL="${SPARKLE_SIGN_UPDATE:-}"
 if [ -z "$SIGN_TOOL" ]; then
     # Try Xcode-bundled or Sparkle SPM build
+    DERIVED_SIGN_UPDATE="$HOME"/Library/Developer/Xcode/DerivedData/Skillport-*/SourcePackages/artifacts/Sparkle/bin/sign_update
     for candidate in \
         "$(xcrun --find sign_update 2>/dev/null || echo '')" \
         "./SourcePackages/artifacts/Sparkle/bin/sign_update" \
-        "~/Library/Developer/Xcode/DerivedData/Skillport-*/SourcePackages/artifacts/Sparkle/bin/sign_update"; do
+        $DERIVED_SIGN_UPDATE; do
         if [ -n "$candidate" ] && [ -x "$candidate" ]; then
             SIGN_TOOL="$candidate"
             break

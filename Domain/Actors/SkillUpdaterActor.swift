@@ -146,7 +146,6 @@ public actor SkillUpdaterActor {
         let parent = canonical.deletingLastPathComponent()
         let suffix = UUID().uuidString
         let tmp = parent.appendingPathComponent(".\(canonical.lastPathComponent).tmp-\(suffix)")
-        let backup = parent.appendingPathComponent(".\(canonical.lastPathComponent).bak-\(suffix)")
         let fm = FileManager.default
 
         // 1. 复制新内容到 tmp（去 .git）。失败 → 清 tmp 抛错。
@@ -157,33 +156,26 @@ public actor SkillUpdaterActor {
             throw error
         }
 
-        // 2. 原子 swap：canonical → backup → tmp → canonical。
-        let canonicalExisted = fm.fileExists(atPath: canonical.path)
+        // 2. 原子替换 canonical，并保留 backup 直到后续 hash/cache 步骤成功。
+        let replacement: DirectoryReplacement
         do {
-            if canonicalExisted {
-                try fm.moveItem(at: canonical, to: backup)
-            }
-            try fm.moveItem(at: tmp, to: canonical)
+            replacement = try DirectoryReplacer.replaceDirectory(at: canonical, withStagedDirectory: tmp)
         } catch {
-            // 回滚
-            if canonicalExisted, fm.fileExists(atPath: backup.path) {
-                try? fm.removeItem(at: canonical)
-                try? fm.moveItem(at: backup, to: canonical)
-            }
             try? fm.removeItem(at: tmp)
             throw error
         }
 
-        // 3. 成功 → 清 backup。
-        if fm.fileExists(atPath: backup.path) {
-            try? fm.removeItem(at: backup)
+        // 3. 算新 folderHash；成功后才清 backup。失败则恢复旧 canonical。
+        do {
+            let newHash = try await git.subdirTreeHash(in: cached, subdir: subdir, ref: "HEAD")
+            let id = SkillIdentity.compute(name: name, source: source)
+            try? await cache.set(identity: id, hash: newHash)
+            try? replacement.commit()
+            return newHash
+        } catch {
+            try? replacement.rollback()
+            throw error
         }
-
-        // 4. 算新 folderHash；同时刷新 commit hash cache。
-        let newHash = try await git.subdirTreeHash(in: cached, subdir: subdir, ref: "HEAD")
-        let id = SkillIdentity.compute(name: name, source: source)
-        try? await cache.set(identity: id, hash: newHash)
-        return newHash
     }
 
     // MARK: - Internals

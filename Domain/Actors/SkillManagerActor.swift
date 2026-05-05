@@ -108,22 +108,35 @@ public actor SkillManagerActor {
         interestingRoots = Self.uniqueURLs(interestingRoots)
 
         let stream = await watcher.start(paths: paths)
-        watchTask = Task { [weak self] in
-            // 100ms debounce — 合并 FSEvents 的洪峰（git 操作、批量安装等）。
-            let debounce: Duration = .milliseconds(100)
-            var pending = false
-            var lastFire: ContinuousClock.Instant? = nil
+        watchTask = Self.debouncedRescanTask(
+            stream: stream,
+            interestingRoots: interestingRoots,
+            debounce: .milliseconds(100)
+        ) { [weak self] in
+            _ = try? await self?.rescan(home: home)
+        }
+    }
+
+    nonisolated static func debouncedRescanTask(
+        stream: AsyncStream<FileEvent>,
+        interestingRoots: [URL],
+        debounce: Duration,
+        rescan: @escaping @Sendable () async -> Void
+    ) -> Task<Void, Never> {
+        Task {
+            // Debounce — 合并 FSEvents 的洪峰（git 操作、批量安装等）。
+            var debounceTask: Task<Void, Never>?
+            defer { debounceTask?.cancel() }
             for await event in stream {
                 guard Self.shouldRescan(event: event, interestingRoots: interestingRoots) else {
                     continue
                 }
-                let now = ContinuousClock.now
-                if let last = lastFire, now - last < debounce, pending { continue }
-                pending = true
-                try? await Task.sleep(for: debounce)
-                lastFire = ContinuousClock.now
-                pending = false
-                _ = try? await self?.rescan(home: home)
+                debounceTask?.cancel()
+                debounceTask = Task {
+                    try? await Task.sleep(for: debounce)
+                    guard !Task.isCancelled else { return }
+                    await rescan()
+                }
             }
         }
     }

@@ -133,6 +133,38 @@ struct SkillManagerActorTests {
         #expect(Set(skills.map(\.id)).count == 2)
     }
 
+    @Test("debouncedRescanTask coalesces quick relevant events")
+    func debouncedRescanTaskCoalescesEvents() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let root = try dir.mkdir(".agents/skills")
+        let (stream, continuation) = AsyncStream<FileEvent>.makeStream()
+        let counter = RescanCounter()
+        let task = SkillManagerActor.debouncedRescanTask(
+            stream: stream,
+            interestingRoots: [root],
+            debounce: .milliseconds(50)
+        ) {
+            await counter.increment()
+        }
+        defer {
+            continuation.finish()
+            task.cancel()
+        }
+
+        continuation.yield(
+            FileEvent(paths: [root.appendingPathComponent("a")], timestamp: Date()))
+        try await Task.sleep(for: .milliseconds(10))
+        continuation.yield(
+            FileEvent(paths: [root.appendingPathComponent("b")], timestamp: Date()))
+        try await Task.sleep(for: .milliseconds(10))
+        continuation.yield(
+            FileEvent(paths: [root.appendingPathComponent("c")], timestamp: Date()))
+        try await Task.sleep(for: .milliseconds(120))
+
+        #expect(await counter.value() == 1)
+    }
+
     private func makeManager(
         home: URL,
         checkStatus: (@Sendable (Skill) async throws -> UpdateStatus)? = nil
@@ -158,5 +190,17 @@ struct SkillManagerActorTests {
             watcher: FileWatcherActor(),
             lockFile: lockFile
         )
+    }
+}
+
+private actor RescanCounter {
+    private var count = 0
+
+    func increment() {
+        count += 1
+    }
+
+    func value() -> Int {
+        count
     }
 }
