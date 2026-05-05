@@ -93,7 +93,7 @@ struct LockFileActorTests {
         #expect(!FileManager.default.fileExists(atPath: path.path))
     }
 
-    @Test("upsert(LockedSkill) adds new then replaces by name")
+    @Test("upsert(LockedSkill) adds new then replaces by identity or path")
     func upsert() async throws {
         let dir = try TempDir.create()
         defer { try? dir.cleanup() }
@@ -117,6 +117,34 @@ struct LockFileActorTests {
         let lock = try await actor.read()
         #expect(lock.skills.count == 1)
         #expect(lock.skills.first?.commitHash == "new")
+    }
+
+    @Test("upsert preserves same-name skills from different sources when paths differ")
+    func upsertPreservesSameNameDifferentSources() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let actor = LockFileActor(path: dir.url.appendingPathComponent(".skill-lock.json"))
+        let first = LockedSkill(
+            name: "demo",
+            source: .github(owner: "one", repo: "repo", ref: "main"),
+            installedAt: Date(),
+            commitHash: nil,
+            path: URL(fileURLWithPath: "/t/demo-one")
+        )
+        let second = LockedSkill(
+            name: "demo",
+            source: .github(owner: "two", repo: "repo", ref: "main"),
+            installedAt: Date(),
+            commitHash: nil,
+            path: URL(fileURLWithPath: "/t/demo-two")
+        )
+
+        try await actor.upsert(first)
+        try await actor.upsert(second)
+
+        let lock = try await actor.read()
+        #expect(lock.skills.count == 2)
+        #expect(Set(lock.skills.map(\.source)).count == 2)
     }
 
     @Test("remove(name:) drops a skill entry")

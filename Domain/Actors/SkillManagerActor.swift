@@ -88,15 +88,24 @@ public actor SkillManagerActor {
         let canonicalBase = home.appendingPathComponent(".agents/skills", isDirectory: true)
         try? fm.createDirectory(at: canonicalBase, withIntermediateDirectories: true)
 
-        // 同时监听每个 agent 的 skillsDir（外部 CLI 直接往 `.claude/skills` 写 skill
-        // 也能触发 rescan）。只收录已存在的目录，FSEvents 对不存在的 path 会忽略但
-        // 也会产生噪声。
-        var paths: [URL] = [canonicalBase]
+        // 同时监听 home（用于捕获运行中首次创建的 `.claude/skills` 等目录）和每个
+        // 已存在的 agent 目录；事件回调里再按相关路径过滤，避免无关 home 变更触发扫描。
+        var paths: [URL] = [home, canonicalBase]
+        var interestingRoots: [URL] = [canonicalBase]
         for agent in Agent.defaultAgents(home: home) {
+            interestingRoots.append(agent.skillsDir)
+            if let configDir = agent.configDir {
+                interestingRoots.append(configDir)
+            }
             if fm.fileExists(atPath: agent.skillsDir.path) {
                 paths.append(agent.skillsDir)
             }
+            if let configDir = agent.configDir, fm.fileExists(atPath: configDir.path) {
+                paths.append(configDir)
+            }
         }
+        paths = Self.uniqueURLs(paths)
+        interestingRoots = Self.uniqueURLs(interestingRoots)
 
         let stream = await watcher.start(paths: paths)
         watchTask = Task { [weak self] in
@@ -104,7 +113,10 @@ public actor SkillManagerActor {
             let debounce: Duration = .milliseconds(100)
             var pending = false
             var lastFire: ContinuousClock.Instant? = nil
-            for await _ in stream {
+            for await event in stream {
+                guard Self.shouldRescan(event: event, interestingRoots: interestingRoots) else {
+                    continue
+                }
                 let now = ContinuousClock.now
                 if let last = lastFire, now - last < debounce, pending { continue }
                 pending = true
@@ -112,6 +124,33 @@ public actor SkillManagerActor {
                 lastFire = ContinuousClock.now
                 pending = false
                 _ = try? await self?.rescan(home: home)
+            }
+        }
+    }
+
+    private nonisolated static func uniqueURLs(_ urls: [URL]) -> [URL] {
+        var seen: Set<String> = []
+        var result: [URL] = []
+        for url in urls {
+            let key = url.standardizedFileURL.path
+            if seen.insert(key).inserted {
+                result.append(url)
+            }
+        }
+        return result
+    }
+
+    private nonisolated static func shouldRescan(
+        event: FileEvent,
+        interestingRoots: [URL]
+    ) -> Bool {
+        event.paths.contains { changed in
+            let changedPath = changed.standardizedFileURL.path
+            return interestingRoots.contains { root in
+                let rootPath = root.standardizedFileURL.path
+                return changedPath == rootPath
+                    || changedPath.hasPrefix(rootPath + "/")
+                    || rootPath.hasPrefix(changedPath + "/")
             }
         }
     }

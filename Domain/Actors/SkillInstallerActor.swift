@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 public actor SkillInstallerActor {
@@ -106,7 +107,6 @@ public actor SkillInstallerActor {
         let fm = FileManager.default
         let canonicalBase = home.appendingPathComponent(".agents/skills", isDirectory: true)
         try fm.createDirectory(at: canonicalBase, withIntermediateDirectories: true)
-        let dest = canonicalBase.appendingPathComponent(skillId, isDirectory: true)
 
         // 拿共享缓存 repo；若是第一次 clone 由 RepoCacheActor 负责。
         let cached = try await repoCache.acquire(url: sourceURL, ref: ref)
@@ -116,10 +116,19 @@ public actor SkillInstallerActor {
             in: cached, skillId: skillId, isSingleRepo: skillId == repo
         )
 
-        let suffix = UUID().uuidString
-        let tmp = canonicalBase.appendingPathComponent(".\(skillId).tmp-\(suffix)", isDirectory: true)
-        let backup = canonicalBase.appendingPathComponent(".\(skillId).bak-\(suffix)", isDirectory: true)
         let oldLock = try await lockFile.read()
+        let source = SkillSource.github(owner: owner, repo: repo, ref: ref)
+        let storageName = Self.storageName(
+            preferred: skillId,
+            source: source,
+            skillPath: relativePath,
+            canonicalBase: canonicalBase,
+            lock: oldLock
+        )
+        let dest = canonicalBase.appendingPathComponent(storageName, isDirectory: true)
+        let suffix = UUID().uuidString
+        let tmp = canonicalBase.appendingPathComponent(".\(storageName).tmp-\(suffix)", isDirectory: true)
+        let backup = canonicalBase.appendingPathComponent(".\(storageName).bak-\(suffix)", isDirectory: true)
 
         // 复制到 staging（去掉 `.git` 避免把 repo 历史带进 skill 目录）。失败时旧 canonical 不动。
         do {
@@ -137,13 +146,11 @@ public actor SkillInstallerActor {
         let folderHash = try? await git.subdirTreeHash(
             in: cached, subdir: relativePath ?? "", ref: "HEAD"
         )
-        let identity = SkillIdentity.compute(
-            name: skillId, source: .github(owner: owner, repo: repo, ref: ref)
-        )
+        let identity = SkillIdentity.compute(name: storageName, source: source)
         let now = Date()
         let locked = LockedSkill(
-            name: skillId,
-            source: .github(owner: owner, repo: repo, ref: ref),
+            name: storageName,
+            source: source,
             installedAt: now,
             commitHash: commitHash,
             path: dest,
@@ -177,14 +184,14 @@ public actor SkillInstallerActor {
         do {
             try await lockFile.upsert(locked)
             for agentID in installTo {
-                try await toggleAgent(name: skillId, agent: agentID, install: true, home: home)
+                try await toggleAgent(name: storageName, agent: agentID, install: true, home: home)
                 agents.insert(agentID)
             }
         } catch {
             try? await lockFile.write(oldLock)
             for agentID in agents {
                 if let agentConfig = Agent.defaultAgents(home: home).first(where: { $0.id == agentID }) {
-                    let link = agentConfig.skillsDir.appendingPathComponent(skillId)
+                    let link = agentConfig.skillsDir.appendingPathComponent(storageName)
                     try? await symlinker.removeInstallation(at: link, canonical: dest)
                 }
             }
@@ -206,9 +213,9 @@ public actor SkillInstallerActor {
             try? await cache.set(identity: identity, hash: commitHash)
         }
         return Skill(
-            name: skillId,
+            name: storageName,
             path: dest,
-            source: .github(owner: owner, repo: repo, ref: ref),
+            source: source,
             frontmatter: parsed.metadata,
             installedAgents: agents,
             updateStatus: .upToDate
@@ -320,6 +327,50 @@ public actor SkillInstallerActor {
             return String(urlPath.dropFirst(basePath.count + 1))
         }
         return url.lastPathComponent
+    }
+
+    private static func storageName(
+        preferred: String,
+        source: SkillSource,
+        skillPath: String?,
+        canonicalBase: URL,
+        lock: LockFile
+    ) -> String {
+        let normalizedPath = normalizedSkillPath(skillPath)
+        if let existing = lock.skills.first(where: {
+            $0.source == source && normalizedSkillPath($0.skillPath) == normalizedPath
+        }) {
+            return existing.name
+        }
+
+        let fm = FileManager.default
+        let preferredPath = canonicalBase.appendingPathComponent(preferred, isDirectory: true)
+        let preferredInLock = lock.skills.contains { $0.name == preferred }
+        if !preferredInLock && !fm.fileExists(atPath: preferredPath.path) {
+            return preferred
+        }
+
+        let suffix = shortHash("\(source)|\(normalizedPath)")
+        var candidate = "\(preferred)--\(suffix)"
+        var counter = 2
+        while lock.skills.contains(where: { $0.name == candidate })
+            || fm.fileExists(atPath: canonicalBase.appendingPathComponent(candidate).path)
+        {
+            candidate = "\(preferred)--\(suffix)-\(counter)"
+            counter += 1
+        }
+        return candidate
+    }
+
+    private static func normalizedSkillPath(_ path: String?) -> String {
+        (path ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+
+    private static func shortHash(_ raw: String) -> String {
+        let digest = SHA256.hash(data: Data(raw.utf8))
+        return String(digest.map { String(format: "%02x", $0) }.joined().prefix(12))
     }
 
     /// 顶层复制，跳过 `excluding` 中的 entry 名（如 `.git`）。嵌套层级保持原样。

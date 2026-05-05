@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 
 public actor LockFileActor {
     public struct ReadResult: Sendable {
@@ -38,7 +38,12 @@ public actor LockFileActor {
     public func upsert(_ skill: LockedSkill) throws {
         try withFileLock {
             var lock = try readWithRecoveryNoticeUnlocked().lockFile
-            lock.skills.removeAll { $0.name == skill.name }
+            let incomingID = SkillIdentity.compute(name: skill.name, source: skill.source)
+            let incomingPath = skill.path.resolvingSymlinksInPath().path
+            lock.skills.removeAll {
+                SkillIdentity.compute(name: $0.name, source: $0.source) == incomingID
+                    || $0.path.resolvingSymlinksInPath().path == incomingPath
+            }
             lock.skills.append(skill)
             try writeUnlocked(lock)
         }

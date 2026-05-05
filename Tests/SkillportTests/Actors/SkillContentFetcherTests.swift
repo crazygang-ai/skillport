@@ -70,6 +70,20 @@ struct SkillContentFetcherCascadeTests {
         #expect(!touched.contains("api.github.com"))
     }
 
+    @Test("raw URL candidates omit root SKILL.md for subskills")
+    func rawCandidatesOmitRootForSubskills() {
+        let rawBase = URL(string: "https://raw.test")!
+        let subskill = SkillContentFetcher.buildCandidateURLs(
+            source: "owner/repo", skillId: "sub", rawBase: rawBase)
+        #expect(!subskill.contains { $0.path == "/owner/repo/main/SKILL.md" })
+        #expect(!subskill.contains { $0.path == "/owner/repo/master/SKILL.md" })
+
+        let rootSkill = SkillContentFetcher.buildCandidateURLs(
+            source: "owner/repo", skillId: "repo", rawBase: rawBase)
+        #expect(rootSkill.contains { $0.path == "/owner/repo/main/SKILL.md" })
+        #expect(rootSkill.contains { $0.path == "/owner/repo/master/SKILL.md" })
+    }
+
     @Test("strategy 2 fires when all raw URLs fail; returns HTML prefixed content")
     func strategy2SkillsShFallback() async throws {
         MockURLProtocol.resetSync()
@@ -89,6 +103,30 @@ struct SkillContentFetcherCascadeTests {
         let content = try await fetcher.fetchContent(source: "owner/repo", skillId: "sub")
         #expect(content.hasPrefix("<!-- HTML -->"))
         #expect(content.contains("<h1>docs</h1>"))
+    }
+
+    @Test("strategy 2 extracts UTF-8 byte-sized chunks without crashing")
+    func strategy2HandlesNonASCIIChunks() async throws {
+        MockURLProtocol.resetSync()
+        MockURLProtocol.stub(
+            urlMatch: { $0.host == "raw.githubusercontent.com" },
+            status: 404,
+            body: Data()
+        )
+        let html = "<h1>文档</h1><p>这里有中文和 emoji 🚀，长度足够超过阈值。</p>"
+        let rsc = makeFakeRSCPayload(htmlBody: html)
+        MockURLProtocol.stub(
+            urlMatch: { $0.host == "skills.sh" },
+            status: 200,
+            body: Data(rsc.utf8)
+        )
+
+        let fetcher = SkillContentFetcher(session: MockURLProtocol.makeSession())
+        let content = try await fetcher.fetchContent(source: "owner/repo", skillId: "sub")
+
+        #expect(content.hasPrefix("<!-- HTML -->"))
+        #expect(content.contains("文档"))
+        #expect(content.contains("🚀"))
     }
 
     @Test("strategy 3 hits Tree API + raw file when strategies 1 and 2 both fail")

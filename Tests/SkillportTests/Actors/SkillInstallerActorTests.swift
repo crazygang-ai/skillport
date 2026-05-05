@@ -301,6 +301,36 @@ struct SkillInstallerMultiSkillTests {
         #expect(FileManager.default.fileExists(atPath: canonical.appendingPathComponent("SKILL.md").path))
     }
 
+    @Test("installGitHub keeps same skillId from different sources in separate storage dirs")
+    func installSameSkillIDFromDifferentSourcesDoesNotCollide() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let firstRepo = try GitFixtures.makeBareRepoWithRootSKILL(under: dir.url)
+        let secondRepoRoot = try dir.mkdir("second-source")
+        let secondRepo = try GitFixtures.makeBareRepoWithRootSKILL(under: secondRepoRoot)
+
+        let installer = makeInstaller(home: home)
+        let first = try await installer.installGitHub(
+            sourceURL: firstRepo, owner: "one", repo: "example", ref: "HEAD",
+            skillId: "example", home: home, installTo: [])
+        let second = try await installer.installGitHub(
+            sourceURL: secondRepo, owner: "two", repo: "example", ref: "HEAD",
+            skillId: "example", home: home, installTo: [])
+
+        #expect(first.name == "example")
+        #expect(second.name != "example")
+        #expect(first.path != second.path)
+        #expect(FileManager.default.fileExists(atPath: first.path.appendingPathComponent("SKILL.md").path))
+        #expect(FileManager.default.fileExists(atPath: second.path.appendingPathComponent("SKILL.md").path))
+
+        let lockPath = home.appendingPathComponent(".agents/.skill-lock.json")
+        let lock = try LockFile.decode(from: Data(contentsOf: lockPath))
+        #expect(lock.skills.count == 2)
+        #expect(Set(lock.skills.map(\.name)).count == 2)
+        #expect(Set(lock.skills.map(\.source)).count == 2)
+    }
+
     @Test("installGitHub records skillFolderHash and skillPath in lockfile for multi-skill repo")
     func installRecordsFolderHashAndPath() async throws {
         let dir = try TempDir.create()
@@ -389,6 +419,16 @@ struct SkillInstallerMultiSkillTests {
         let home = try dir.mkdir("home")
         let canonical = try oldCanonicalSkill(home: home, name: "example")
         let bareRepo = try GitFixtures.makeBareRepoWithRootSKILL(under: dir.url)
+        let lockFile = LockFileActor(path: home.appendingPathComponent(".agents/.skill-lock.json"))
+        try await lockFile.upsert(
+            LockedSkill(
+                name: "example",
+                source: .github(owner: "t", repo: "example", ref: "HEAD"),
+                installedAt: Date(),
+                commitHash: nil,
+                path: canonical
+            )
+        )
         let blockingUserDir = home.appendingPathComponent(".kiro/skills/example")
         try FileManager.default.createDirectory(at: blockingUserDir, withIntermediateDirectories: true)
         let installer = makeInstaller(home: home)

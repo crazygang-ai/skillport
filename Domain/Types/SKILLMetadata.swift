@@ -39,20 +39,21 @@ public struct SKILLMetadata: @unchecked Sendable, Equatable {
         var extras = raw
         let name = extras.removeValue(forKey: "name") as? String
         let description = extras.removeValue(forKey: "description") as? String
-        let version: String?
-        if let v = extras.removeValue(forKey: "version") {
-            version = "\(v)"
-        } else {
-            version = nil
-        }
-        let allowedTools: [String]?
-        if let tools = extras.removeValue(forKey: "allowedTools") as? [Any] {
-            allowedTools = tools.compactMap { $0 as? String }
-        } else {
-            allowedTools = nil
-        }
+        var metadataExtras = extras.removeValue(forKey: "metadata") as? [String: Any] ?? [:]
+        let version =
+            Self.stringValue(extras.removeValue(forKey: "version"))
+            ?? Self.stringValue(metadataExtras.removeValue(forKey: "version"))
+        let allowedTools = Self.allowedToolsValue(
+            extras.removeValue(forKey: "allowedTools")
+                ?? extras.removeValue(forKey: "allowed-tools")
+        )
         let license = extras.removeValue(forKey: "license") as? String
-        let author = extras.removeValue(forKey: "author") as? String
+        let author =
+            Self.stringValue(extras.removeValue(forKey: "author"))
+            ?? Self.stringValue(metadataExtras.removeValue(forKey: "author"))
+        if !metadataExtras.isEmpty {
+            extras["metadata"] = metadataExtras
+        }
 
         return SKILLMetadata(
             name: name,
@@ -74,18 +75,40 @@ public struct SKILLMetadata: @unchecked Sendable, Equatable {
             dict["description"] = description
         }
         if let version {
-            dict["version"] = version
+            var metadata = dict.removeValue(forKey: "metadata") as? [String: Any] ?? [:]
+            metadata["version"] = version
+            dict["metadata"] = metadata
         }
         if let allowedTools {
-            dict["allowedTools"] = allowedTools
+            dict["allowed-tools"] = allowedTools.joined(separator: ", ")
         }
         if let license {
             dict["license"] = license
         }
         if let author {
-            dict["author"] = author
+            var metadata = dict.removeValue(forKey: "metadata") as? [String: Any] ?? [:]
+            metadata["author"] = author
+            dict["metadata"] = metadata
         }
         return try Yams.dump(object: dict)
+    }
+
+    private static func stringValue(_ value: Any?) -> String? {
+        guard let value else { return nil }
+        if let string = value as? String { return string }
+        return "\(value)"
+    }
+
+    private static func allowedToolsValue(_ value: Any?) -> [String]? {
+        if let tools = value as? [Any] {
+            let parsed = tools.compactMap { stringValue($0) }
+            return parsed.isEmpty ? nil : parsed
+        }
+        guard let raw = stringValue(value) else { return nil }
+        let parsed = raw.split(separator: ",").map {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines)
+        }.filter { !$0.isEmpty }
+        return parsed.isEmpty ? nil : parsed
     }
 
     public static func == (lhs: SKILLMetadata, rhs: SKILLMetadata) -> Bool {

@@ -30,14 +30,33 @@ public struct SKILLMetadata: Sendable, Hashable {
         guard !yaml.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return SKILLMetadata()
         }
-        let node = try Yams.load(yaml: yaml) as? [String: Any] ?? [:]
+        var node = try Yams.load(yaml: yaml) as? [String: Any] ?? [:]
+        var metadata = node.removeValue(forKey: "metadata") as? [String: Any] ?? [:]
         return SKILLMetadata(
             name: node["name"] as? String,
             description: node["description"] as? String,
-            version: node["version"] as? String,
-            allowedTools: node["allowedTools"] as? [String],
+            version: stringValue(node["version"]) ?? stringValue(metadata.removeValue(forKey: "version")),
+            allowedTools: allowedToolsValue(node["allowedTools"] ?? node["allowed-tools"]),
             license: node["license"] as? String,
-            author: node["author"] as? String
+            author: stringValue(node["author"]) ?? stringValue(metadata.removeValue(forKey: "author"))
         )
+    }
+
+    private static func stringValue(_ value: Any?) -> String? {
+        guard let value else { return nil }
+        if let string = value as? String { return string }
+        return "\(value)"
+    }
+
+    private static func allowedToolsValue(_ value: Any?) -> [String]? {
+        if let tools = value as? [Any] {
+            let parsed = tools.compactMap { stringValue($0) }
+            return parsed.isEmpty ? nil : parsed
+        }
+        guard let raw = stringValue(value) else { return nil }
+        let parsed = raw.split(separator: ",").map {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines)
+        }.filter { !$0.isEmpty }
+        return parsed.isEmpty ? nil : parsed
     }
 }

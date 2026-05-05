@@ -36,7 +36,7 @@ public actor SkillUpdaterActor {
         case .github(let owner, let repo, let ref):
             // 查 lockfile 取 skillPath + baseline folderHash + dismissedUpdate。
             // 没注入 lockFile 时退化到整仓 tree hash（老行为）。
-            let locked: LockedSkill? = await readLocked(name: name)
+            let locked: LockedSkill? = await readLocked(name: name, source: source)
             let skillPath: String
             do {
                 skillPath = try Self.normalizedRepoSubdir(locked?.skillPath)
@@ -188,10 +188,10 @@ public actor SkillUpdaterActor {
 
     // MARK: - Internals
 
-    private func readLocked(name: String) async -> LockedSkill? {
+    private func readLocked(name: String, source: SkillSource) async -> LockedSkill? {
         guard let lockFile else { return nil }
         guard let lock = try? await lockFile.read() else { return nil }
-        return lock.skills.first { $0.name == name }
+        return lock.skills.first { $0.name == name && $0.source == source }
     }
 
     private static func normalizedRepoSubdir(_ raw: String?) throws -> String {

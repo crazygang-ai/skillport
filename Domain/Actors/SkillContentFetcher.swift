@@ -150,12 +150,14 @@ public actor SkillContentFetcher {
 
     public static func buildCandidateURLs(source: String, skillId: String, rawBase: URL) -> [URL] {
         let branches = ["main", "master"]
-        let layouts = [
+        var layouts = [
             "\(skillId)/SKILL.md",
             "skills/\(skillId)/SKILL.md",
             ".claude/skills/\(skillId)/SKILL.md",
-            "SKILL.md",
         ]
+        if source.split(separator: "/").last.map(String.init) == skillId {
+            layouts.append("SKILL.md")
+        }
         return branches.flatMap { branch in
             layouts.compactMap { layout in
                 URL(string: "\(rawBase.absoluteString)/\(source)/\(branch)/\(layout)")
@@ -187,24 +189,37 @@ public actor SkillContentFetcher {
     private func extractLargestTChunk(in payload: String) throws -> String {
         let pattern = #"^\w+:T([0-9a-f]+),"#
         let regex = try NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines])
-        let ns = payload as NSString
-        let range = NSRange(location: 0, length: ns.length)
-        var bestOffset = -1
+        let range = NSRange(payload.startIndex..<payload.endIndex, in: payload)
+        var bestOffset: Int?
         var bestSize = 0
         regex.enumerateMatches(in: payload, options: [], range: range) { m, _, _ in
             guard let m, m.numberOfRanges >= 2 else { return }
-            let hex = ns.substring(with: m.range(at: 1))
+            guard let hexRange = Range(m.range(at: 1), in: payload),
+                let matchRange = Range(m.range, in: payload),
+                let byteOffset = matchRange.upperBound.samePosition(in: payload.utf8)
+            else {
+                return
+            }
+            let hex = String(payload[hexRange])
             let size = Int(hex, radix: 16) ?? 0
-            let afterOffset = m.range.location + m.range.length
             if size > bestSize {
                 bestSize = size
-                bestOffset = afterOffset
+                bestOffset = payload.utf8.distance(from: payload.utf8.startIndex, to: byteOffset)
             }
         }
-        guard bestOffset >= 0, bestSize >= 50 else {
+        guard let bestOffset, bestSize >= 50 else {
             throw SkillportError.parseFailed(file: nil, reason: "no suitable T chunk")
         }
-        let html = ns.substring(with: NSRange(location: bestOffset, length: bestSize))
+        guard let payloadData = payload.data(using: .utf8),
+            bestOffset >= 0,
+            bestOffset + bestSize <= payloadData.count
+        else {
+            throw SkillportError.parseFailed(file: nil, reason: "T chunk size exceeds payload")
+        }
+        let htmlData = payloadData.subdata(in: bestOffset..<(bestOffset + bestSize))
+        guard let html = String(data: htmlData, encoding: .utf8) else {
+            throw SkillportError.parseFailed(file: nil, reason: "T chunk is not utf8")
+        }
         guard html.contains("<") else {
             throw SkillportError.parseFailed(file: nil, reason: "T chunk not HTML")
         }
