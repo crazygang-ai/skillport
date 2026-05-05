@@ -67,6 +67,39 @@ struct RegistryModelTests {
         }
     }
 
+    @Test("select(id:) ignores stale slower content response")
+    func selectRaceKeepsCurrentSelection() async throws {
+        let model = makeModel()
+        model.skills = [
+            RegistrySkill(id: "owner/a/a", skillId: "a", name: "A", installs: 1, source: "owner/a"),
+            RegistrySkill(id: "owner/b/b", skillId: "b", name: "B", installs: 1, source: "owner/b"),
+        ]
+        MockURLProtocol.stub(
+            urlMatch: { $0.host == "raw.githubusercontent.com" },
+            handler: { request in
+                let path = request.url?.path ?? ""
+                if path.contains("/owner/a/") {
+                    Thread.sleep(forTimeInterval: 0.25)
+                    return .init(statusCode: 200, headers: [:], body: Data("# A body".utf8))
+                }
+                return .init(statusCode: 200, headers: [:], body: Data("# B body".utf8))
+            }
+        )
+
+        let first = Task { await model.select(id: "owner/a/a") }
+        try await Task.sleep(nanoseconds: 50_000_000)
+        await model.select(id: "owner/b/b")
+        await first.value
+
+        #expect(model.selectedID == "owner/b/b")
+        switch model.rendered {
+        case .markdown(let s):
+            #expect(String(s.characters).contains("B body"))
+        default:
+            Issue.record("expected .markdown rendered result, got \(model.rendered)")
+        }
+    }
+
     @Test("runSearchNow hits /api/search and populates skills")
     func searchFiresNetwork() async throws {
         let model = makeModel()

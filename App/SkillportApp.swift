@@ -1,7 +1,22 @@
+import AppKit
 import SwiftUI
+
+private final class AppLifecycleDelegate: NSObject, NSApplicationDelegate {
+    var shutdown: (@MainActor @Sendable () async -> Void)?
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let shutdown else { return .terminateNow }
+        Task { @MainActor in
+            await shutdown()
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
+}
 
 @main
 struct SkillportApp: App {
+    @NSApplicationDelegateAdaptor(AppLifecycleDelegate.self) private var lifecycleDelegate
     @State private var container = AppContainer()
 
     var body: some Scene {
@@ -14,6 +29,9 @@ struct SkillportApp: App {
                 .environment(container.updateModel)
                 .environment(container.registryModel)
                 .task {
+                    lifecycleDelegate.shutdown = { [container] in
+                        await container.shutdown()
+                    }
                     try? await container.skillsModel.refresh()
                     await container.skillsModel.startWatching()
                 }
@@ -54,9 +72,7 @@ struct SkillportApp: App {
                 Button(String(localized: "Check for Skill Updates")) {
                     Task {
                         do {
-                            let results = try await container.manager.checkAllUpdates(
-                                skills: container.skillsModel.skills
-                            )
+                            let results = try await container.skillsModel.checkAllUpdates()
                             let available = results.values.filter {
                                 if case .available = $0 { return true }
                                 return false

@@ -62,14 +62,35 @@ struct AgentDetectorTests {
         #expect(map[.claudeCode]?.isInstalled == false)
     }
 
-    @Test("detectAllStatuses counts skills under skillsDir")
+    @Test("detectAllStatuses counts only valid skills under skillsDir")
     func statusesSkillCount() async throws {
         let dir = try TempDir.create()
         defer { try? dir.cleanup() }
         let home = try dir.mkdir("home")
         let claudeSkills = home.appendingPathComponent(".claude/skills")
-        try FileManager.default.createDirectory(at: claudeSkills.appendingPathComponent("a"), withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: claudeSkills.appendingPathComponent("b"), withIntermediateDirectories: true)
+        let valid = claudeSkills.appendingPathComponent("valid")
+        try FileManager.default.createDirectory(at: valid, withIntermediateDirectories: true)
+        try "---\n---\n".write(
+            to: valid.appendingPathComponent("SKILL.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try FileManager.default.createDirectory(
+            at: claudeSkills.appendingPathComponent("plain-dir"),
+            withIntermediateDirectories: true
+        )
+        let hidden = claudeSkills.appendingPathComponent(".hidden")
+        try FileManager.default.createDirectory(at: hidden, withIntermediateDirectories: true)
+        try "---\n---\n".write(
+            to: hidden.appendingPathComponent("SKILL.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        let linkedTarget = try AgentsFS.createCanonicalSkill(in: home, name: "linked")
+        try FileManager.default.createSymbolicLink(
+            at: claudeSkills.appendingPathComponent("linked"),
+            withDestinationURL: linkedTarget
+        )
         let emptyBin = try dir.mkdir("emptybin")
         let detector = AgentDetector(pathOverride: emptyBin.path)
         let map = try await detector.detectAllStatuses(home: home)

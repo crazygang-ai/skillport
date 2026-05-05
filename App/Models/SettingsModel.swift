@@ -12,7 +12,7 @@ public final class SettingsModel {
 
     public static let autoCheckKey = "autoCheckUpdates"
     public static let appleLanguagesKey = "AppleLanguages"
-    public static let keychainProxyAccount = "proxy"
+    public static let keychainProxyAccount = ProxySettingsActor.proxyPasswordAccount
 
     private let proxyActor: ProxySettingsActor
     private let keychain: KeychainActor

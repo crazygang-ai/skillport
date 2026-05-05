@@ -75,6 +75,8 @@ targets:
         BUNDLE_LOADER: "$(TEST_HOST)"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Skillport.app/Contents/MacOS/Skillport"
         GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGN_IDENTITY: ""
   SkillportPreview:
     type: app-extension
     platform: macOS

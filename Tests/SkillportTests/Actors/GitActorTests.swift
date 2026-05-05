@@ -130,4 +130,24 @@ struct GitActorTests {
         let tree = try await git.treeHash(in: repo, ref: "HEAD")
         #expect(sub == tree)
     }
+
+    @Test("proxy settings are converted to git process environment")
+    func proxyEnvironment() async throws {
+        let suite = "skillport-git-proxy-\(UUID())"
+        let proxySettings = ProxySettingsActor(suiteName: suite)
+        await proxySettings.save(
+            ProxyConfig(
+                enabled: true,
+                kind: .socks5,
+                host: "127.0.0.1",
+                port: 1080,
+                username: "alice",
+                bypassList: ["localhost"]
+            )
+        )
+        let env = await GitActor(proxySettings: proxySettings)
+            .effectiveProxyEnvironmentForTesting(password: "secret")
+        #expect(env["ALL_PROXY"] == "socks5://alice:secret@127.0.0.1:1080")
+        #expect(env["NO_PROXY"] == "localhost")
+    }
 }

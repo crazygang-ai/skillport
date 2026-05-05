@@ -2,6 +2,7 @@ import Foundation
 
 public actor ProxySettingsActor {
     private static let key = "skillport.proxy.config.v1"
+    public static let proxyPasswordAccount = "proxy"
     private let defaults: UserDefaults
     public private(set) var current: ProxyConfig
 
@@ -27,5 +28,17 @@ public actor ProxySettingsActor {
         if let data = try? JSONEncoder().encode(config) {
             defaults.set(data, forKey: Self.key)
         }
+    }
+
+    public func makeSession(password: String? = nil) -> URLSession {
+        NetworkSession.makeSession(proxy: current, password: password)
+    }
+
+    public func connectionProxySummary(password: String? = nil) -> [String: String] {
+        NetworkSession.connectionProxySummary(proxy: current, password: password)
+    }
+
+    public func proxyEnvironment(password: String? = nil) -> [String: String] {
+        NetworkSession.proxyEnvironment(proxy: current, password: password)
     }
 }

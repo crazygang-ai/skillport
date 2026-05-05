@@ -8,7 +8,7 @@ This file provides guidance to Codex when working with Skillport.
 ./Scripts/bootstrap.sh              # one-time
 ./Scripts/generate-project.sh       # regenerate after project.yml changes
 xcodebuild -scheme Skillport build  # CLI build
-xcodebuild -scheme Skillport test   # run unit tests
+xcodebuild -scheme Skillport -derivedDataPath build/DerivedData -destination platform=macOS,arch=arm64 CODE_SIGNING_ALLOWED=NO test -quiet
 ```
 
 ## Architecture

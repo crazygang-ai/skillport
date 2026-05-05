@@ -1,40 +1,50 @@
 import Foundation
 
 public actor BatchUpdateCheckerActor {
-    private let updater: SkillUpdaterActor
+    private let checkStatus: @Sendable (Skill) async throws -> UpdateStatus
     private let maxConcurrent: Int
 
     public init(updater: SkillUpdaterActor, maxConcurrent: Int = 4) {
-        self.updater = updater
-        self.maxConcurrent = maxConcurrent
+        self.checkStatus = { skill in
+            try await updater.checkStatus(
+                name: skill.name, source: skill.source, canonical: skill.path
+            )
+        }
+        self.maxConcurrent = max(1, maxConcurrent)
+    }
+
+    public init(
+        maxConcurrent: Int = 4,
+        checkStatus: @escaping @Sendable (Skill) async throws -> UpdateStatus
+    ) {
+        self.checkStatus = checkStatus
+        self.maxConcurrent = max(1, maxConcurrent)
     }
 
     public func checkAll(skills: [Skill]) async throws -> [SkillIdentity: UpdateStatus] {
-        var result: [SkillIdentity: UpdateStatus] = [:]
-        // 分批扫描，保持 maxConcurrent
-        var iterator = skills.makeIterator()
-        var inFlight: [Task<(SkillIdentity, UpdateStatus), Error>] = []
+        try await withThrowingTaskGroup(of: (SkillIdentity, UpdateStatus).self) { group in
+            var result: [SkillIdentity: UpdateStatus] = [:]
+            var iterator = skills.makeIterator()
+            let limit = min(maxConcurrent, skills.count)
 
-        func dispatchNext() {
-            guard let skill = iterator.next() else { return }
-            let updater = self.updater
-            inFlight.append(
-                Task {
-                    let status = try await updater.checkStatus(
-                        name: skill.name, source: skill.source, canonical: skill.path
-                    )
+            func dispatchNext() -> Bool {
+                guard let skill = iterator.next() else { return false }
+                let checkStatus = self.checkStatus
+                group.addTask {
+                    let status = try await checkStatus(skill)
                     return (skill.id, status)
-                })
-        }
+                }
+                return true
+            }
 
-        for _ in 0..<min(maxConcurrent, skills.count) { dispatchNext() }
-
-        while !inFlight.isEmpty {
-            let task = inFlight.removeFirst()
-            let (id, status) = try await task.value
-            result[id] = status
-            dispatchNext()
+            for _ in 0..<limit {
+                _ = dispatchNext()
+            }
+            while let (id, status) = try await group.next() {
+                result[id] = status
+                _ = dispatchNext()
+            }
+            return result
         }
-        return result
     }
 }

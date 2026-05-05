@@ -13,16 +13,29 @@ public final class AppContainer {
     public let registryActor: RegistryActor
     public let contentFetcher: SkillContentFetcher
     public let repoCache: RepoCacheActor
+    public let git: GitActor
 
-    public init(home: URL = URL(fileURLWithPath: NSHomeDirectory())) {
+    public init(
+        home: URL = URL(fileURLWithPath: NSHomeDirectory()),
+        proxySettings: ProxySettingsActor = ProxySettingsActor(),
+        keychain: KeychainActor = KeychainActor(),
+        defaults: UserDefaults = .standard,
+        repoCacheRoot: URL? = nil
+    ) {
         self.home = home
         let lockPath = home.appendingPathComponent(".agents/.skill-lock.json")
         let cachePath = home.appendingPathComponent(".agents/.skillport-cache.json")
         let cache = CommitHashCache(path: cachePath)
-        let git = GitActor()
+        let git = GitActor(proxySettings: proxySettings, keychain: keychain)
+        self.git = git
         let symlinker = SymlinkManagerActor()
         let lockFile = LockFileActor(path: lockPath)
-        let repoCache = RepoCacheActor(git: git)
+        let repoCache = RepoCacheActor(
+            git: git,
+            root: repoCacheRoot
+                ?? FileManager.default.temporaryDirectory
+                    .appendingPathComponent("skillport-repos", isDirectory: true)
+        )
         self.repoCache = repoCache
         let installer = SkillInstallerActor(
             git: git, symlinker: symlinker, lockFile: lockFile, cache: cache, repoCache: repoCache
@@ -43,9 +56,8 @@ public final class AppContainer {
         self.manager = manager
 
         // Registry stack (M5)
-        let session = NetworkSession.makeSession(proxy: ProxyConfig())
-        let registryActor = RegistryActor(session: session)
-        let contentFetcher = SkillContentFetcher(session: session)
+        let registryActor = RegistryActor(proxySettings: proxySettings, keychain: keychain)
+        let contentFetcher = SkillContentFetcher(proxySettings: proxySettings, keychain: keychain)
         self.registryActor = registryActor
         self.contentFetcher = contentFetcher
         self.registryModel = RegistryModel(
@@ -64,12 +76,17 @@ public final class AppContainer {
         self.skillsModel = SkillsModel(
             manager: manager, home: home, notifications: self.notificationModel
         )
-        self.settingsModel = SettingsModel(proxyActor: ProxySettingsActor())
+        self.settingsModel = SettingsModel(
+            proxyActor: proxySettings,
+            keychain: keychain,
+            defaults: defaults
+        )
         self.updateModel = UpdateModel(bridge: AppUpdaterBridge())
     }
 
     /// Clean up shared `/tmp` repo cache on shutdown.
     public func shutdown() async {
+        await skillsModel.stopWatching()
         await repoCache.cleanupAll()
     }
 }

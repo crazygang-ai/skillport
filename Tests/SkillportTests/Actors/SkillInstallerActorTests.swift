@@ -88,6 +88,74 @@ struct SkillInstallerActorTests {
         try await installer.toggleAgent(name: "t", agent: .kiro, install: false, home: home)
         #expect(!FileManager.default.fileExists(atPath: link.path))
     }
+
+    @Test("toggle-off does not delete same-name real agent-local directory")
+    func toggleOffLeavesUserDirectory() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let src = try dir.mkdir("user-owned")
+        try "---\n---\n".write(
+            to: src.appendingPathComponent("SKILL.md"),
+            atomically: true, encoding: .utf8
+        )
+        let home = try dir.mkdir("home")
+        let installer = SkillInstallerActor(
+            git: GitActor(),
+            symlinker: SymlinkManagerActor(),
+            lockFile: LockFileActor(path: home.appendingPathComponent(".agents/.skill-lock.json")),
+            cache: CommitHashCache(path: home.appendingPathComponent(".agents/.skillport-cache.json"))
+        )
+        _ = try await installer.installLocal(from: src, home: home, installTo: [])
+        let userDir = home.appendingPathComponent(".kiro/skills/user-owned")
+        try FileManager.default.createDirectory(at: userDir, withIntermediateDirectories: true)
+        try "do not delete".write(
+            to: userDir.appendingPathComponent("note.txt"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        try await installer.toggleAgent(name: "user-owned", agent: .kiro, install: false, home: home)
+
+        #expect(FileManager.default.fileExists(atPath: userDir.appendingPathComponent("note.txt").path))
+    }
+
+    @Test("uninstall removes canonical and managed symlink but leaves same-name real agent-local directory")
+    func uninstallLeavesUserDirectory() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let src = try dir.mkdir("safe-uninstall")
+        try "---\n---\n".write(
+            to: src.appendingPathComponent("SKILL.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        let home = try dir.mkdir("home")
+        let installer = SkillInstallerActor(
+            git: GitActor(),
+            symlinker: SymlinkManagerActor(),
+            lockFile: LockFileActor(path: home.appendingPathComponent(".agents/.skill-lock.json")),
+            cache: CommitHashCache(path: home.appendingPathComponent(".agents/.skillport-cache.json"))
+        )
+        _ = try await installer.installLocal(from: src, home: home, installTo: [.kiro])
+        let managedLink = home.appendingPathComponent(".kiro/skills/safe-uninstall")
+        #expect(FileManager.default.fileExists(atPath: managedLink.path))
+
+        let userDir = home.appendingPathComponent(".claude/skills/safe-uninstall")
+        try FileManager.default.createDirectory(at: userDir, withIntermediateDirectories: true)
+        try "mine".write(
+            to: userDir.appendingPathComponent("note.txt"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        try await installer.uninstall(name: "safe-uninstall", home: home)
+
+        #expect(!FileManager.default.fileExists(atPath: managedLink.path))
+        #expect(
+            !FileManager.default.fileExists(
+                atPath: home.appendingPathComponent(".agents/skills/safe-uninstall").path))
+        #expect(FileManager.default.fileExists(atPath: userDir.appendingPathComponent("note.txt").path))
+    }
 }
 
 @Suite("SkillInstallerActor — multi-skill repos", .serialized)
@@ -198,6 +266,69 @@ struct SkillInstallerMultiSkillTests {
         #expect((entry?.skillFolderHash?.count ?? 0) == 40)
     }
 
+    @Test("installGitHub copy failure preserves existing canonical skill")
+    func installGitHubCopyFailurePreservesExistingCanonical() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let canonical = try oldCanonicalSkill(home: home, name: "example")
+        let bareRepo = try GitFixtures.makeBareRepoWithRootSKILL(under: dir.url)
+        let installer = makeInstaller(
+            home: home,
+            directoryCopy: { _, _, _ in
+                throw SkillportError.fileIO(path: canonical, reason: "simulated copy failure")
+            }
+        )
+
+        await #expect(throws: SkillportError.self) {
+            _ = try await installer.installGitHub(
+                sourceURL: bareRepo, owner: "t", repo: "example", ref: "HEAD",
+                skillId: "example", home: home, installTo: [])
+        }
+
+        #expect(try skillBody(at: canonical) == "old")
+    }
+
+    @Test("installGitHub locate failure preserves existing canonical skill")
+    func installGitHubLocateFailurePreservesExistingCanonical() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let canonical = try oldCanonicalSkill(home: home, name: "missing")
+        let bareRepo = try GitFixtures.makeBareRepoWithSubSkills(
+            under: dir.url, subs: ["other"])
+        let installer = makeInstaller(home: home)
+
+        await #expect(throws: SkillportError.self) {
+            _ = try await installer.installGitHub(
+                sourceURL: bareRepo, owner: "t", repo: "example", ref: "HEAD",
+                skillId: "missing", home: home, installTo: [])
+        }
+
+        #expect(try skillBody(at: canonical) == "old")
+    }
+
+    @Test("installGitHub post-swap agent failure rolls back existing canonical skill")
+    func installGitHubPostSwapFailureRollsBackCanonical() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let canonical = try oldCanonicalSkill(home: home, name: "example")
+        let bareRepo = try GitFixtures.makeBareRepoWithRootSKILL(under: dir.url)
+        let blockingUserDir = home.appendingPathComponent(".kiro/skills/example")
+        try FileManager.default.createDirectory(at: blockingUserDir, withIntermediateDirectories: true)
+        let installer = makeInstaller(home: home)
+
+        await #expect(throws: SkillportError.self) {
+            _ = try await installer.installGitHub(
+                sourceURL: bareRepo, owner: "t", repo: "example", ref: "HEAD",
+                skillId: "example", home: home, installTo: [.kiro])
+        }
+
+        #expect(try skillBody(at: canonical) == "old")
+        #expect(FileManager.default.fileExists(atPath: blockingUserDir.path))
+    }
+
     @Test("toggleAgent skips symlink when fallback chain already grants access")
     func toggleSkipsInheritedAgent() async throws {
         let dir = try TempDir.create()
@@ -247,13 +378,37 @@ struct SkillInstallerMultiSkillTests {
         #expect(FileManager.default.fileExists(atPath: beta.path))
     }
 
-    private func makeInstaller(home: URL) -> SkillInstallerActor {
+    private func makeInstaller(
+        home: URL,
+        directoryCopy: @escaping SkillInstallerActor.DirectoryCopy = { src, dest, excludes in
+            try SkillInstallerActor.copyDirectory(from: src, to: dest, excluding: excludes)
+        }
+    ) -> SkillInstallerActor {
         SkillInstallerActor(
             git: GitActor(),
             symlinker: SymlinkManagerActor(),
             lockFile: LockFileActor(path: home.appendingPathComponent(".agents/.skill-lock.json")),
             cache: CommitHashCache(
-                path: home.appendingPathComponent(".agents/.skillport-cache.json"))
+                path: home.appendingPathComponent(".agents/.skillport-cache.json")),
+            directoryCopy: directoryCopy
         )
+    }
+
+    @discardableResult
+    private func oldCanonicalSkill(home: URL, name: String) throws -> URL {
+        let canonical = home.appendingPathComponent(".agents/skills/\(name)", isDirectory: true)
+        try FileManager.default.createDirectory(at: canonical, withIntermediateDirectories: true)
+        try "---\n---\nold".write(
+            to: canonical.appendingPathComponent("SKILL.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        return canonical
+    }
+
+    private func skillBody(at canonical: URL) throws -> String {
+        let raw = try String(contentsOf: canonical.appendingPathComponent("SKILL.md"), encoding: .utf8)
+        return raw.components(separatedBy: "---").last?.trimmingCharacters(in: .whitespacesAndNewlines)
+            ?? raw
     }
 }

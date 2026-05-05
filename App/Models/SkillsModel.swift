@@ -12,7 +12,7 @@ public final class SkillsModel {
     private let detector: AgentDetector
     private let home: URL
     private weak var notifications: NotificationModel?
-    nonisolated(unsafe) private var subscription: Task<Void, Never>?
+    @ObservationIgnored private var subscription: Task<Void, Never>?
 
     public init(
         manager: SkillManagerActor,
@@ -34,12 +34,14 @@ public final class SkillsModel {
 
     private func subscribe() {
         subscription = Task { [weak self, manager] in
-            let stream = await manager.events
+            let stream = manager.events
             for await event in stream {
                 guard let self else { return }
                 switch event {
                 case .skillsReloaded(let list):
                     self.skills = list
+                case .skillUpdateStatusChanged(let id, let status):
+                    self.applyUpdateStatus(id: id, status: status)
                 case .error(let err):
                     self.notifications?.post(.init(level: .error, message: Self.message(for: err)))
                 default:
@@ -124,8 +126,26 @@ public final class SkillsModel {
         try await manager.uninstall(name: name, home: home)
     }
 
+    @discardableResult
+    public func checkAllUpdates() async throws -> [SkillIdentity: UpdateStatus] {
+        let results = try await manager.checkAllUpdates(skills: skills)
+        applyUpdateStatuses(results)
+        return results
+    }
+
     public func skillsFiltered(by agent: AgentID?) -> [Skill] {
         guard let agent else { return skills }
         return skills.filter { $0.installedAgents.contains(agent) }
+    }
+
+    private func applyUpdateStatuses(_ statuses: [SkillIdentity: UpdateStatus]) {
+        for (id, status) in statuses {
+            applyUpdateStatus(id: id, status: status)
+        }
+    }
+
+    private func applyUpdateStatus(id: SkillIdentity, status: UpdateStatus) {
+        guard let index = skills.firstIndex(where: { $0.id == id }) else { return }
+        skills[index].updateStatus = status
     }
 }

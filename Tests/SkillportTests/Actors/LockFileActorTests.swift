@@ -80,6 +80,19 @@ struct LockFileActorTests {
         #expect(!FileManager.default.fileExists(atPath: path.path))
     }
 
+    @Test("readWithRecoveryNotice reports corrupt lockfile while preserving recovery")
+    func readReportsRecoveryNotice() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let path = dir.url.appendingPathComponent(".skill-lock.json")
+        try "not json".write(to: path, atomically: true, encoding: .utf8)
+        let result = try await LockFileActor(path: path).readWithRecoveryNotice()
+        #expect(result.lockFile.skills.isEmpty)
+        #expect(result.recoveryError != nil)
+        #expect(result.backupURL != nil)
+        #expect(!FileManager.default.fileExists(atPath: path.path))
+    }
+
     @Test("upsert(LockedSkill) adds new then replaces by name")
     func upsert() async throws {
         let dir = try TempDir.create()

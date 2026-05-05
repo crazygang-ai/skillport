@@ -1,12 +1,15 @@
 import Foundation
 
 public actor SkillInstallerActor {
+    public typealias DirectoryCopy = @Sendable (_ src: URL, _ dest: URL, _ excludes: Set<String>) throws -> Void
+
     private let git: GitActor
     private let symlinker: SymlinkManagerActor
     private let lockFile: LockFileActor
     private let cache: CommitHashCache
     private let repoCache: RepoCacheActor
     private let localImporter: LocalImporter
+    private let directoryCopy: DirectoryCopy
 
     public init(
         git: GitActor,
@@ -14,7 +17,10 @@ public actor SkillInstallerActor {
         lockFile: LockFileActor,
         cache: CommitHashCache,
         repoCache: RepoCacheActor? = nil,
-        localImporter: LocalImporter = LocalImporter()
+        localImporter: LocalImporter = LocalImporter(),
+        directoryCopy: @escaping DirectoryCopy = { src, dest, excludes in
+            try SkillInstallerActor.copyDirectory(from: src, to: dest, excluding: excludes)
+        }
     ) {
         self.git = git
         self.symlinker = symlinker
@@ -22,6 +28,7 @@ public actor SkillInstallerActor {
         self.cache = cache
         self.repoCache = repoCache ?? RepoCacheActor(git: git)
         self.localImporter = localImporter
+        self.directoryCopy = directoryCopy
     }
 
     @discardableResult
@@ -88,11 +95,6 @@ public actor SkillInstallerActor {
         try fm.createDirectory(at: canonicalBase, withIntermediateDirectories: true)
         let dest = canonicalBase.appendingPathComponent(skillId, isDirectory: true)
 
-        // 幂等：dest 已存在（旧版本、broken install）→ 覆盖，不 throw。
-        if fm.fileExists(atPath: dest.path) {
-            try fm.removeItem(at: dest)
-        }
-
         // 拿共享缓存 repo；若是第一次 clone 由 RepoCacheActor 负责。
         let cached = try await repoCache.acquire(url: sourceURL, ref: ref)
 
@@ -101,8 +103,21 @@ public actor SkillInstallerActor {
             in: cached, skillId: skillId, isSingleRepo: skillId == repo
         )
 
-        // 复制到 canonical dest（去掉 `.git` 避免把 repo 历史带进 skill 目录）。
-        try Self.copyDirectory(from: srcDir, to: dest, excluding: [".git"])
+        let suffix = UUID().uuidString
+        let tmp = canonicalBase.appendingPathComponent(".\(skillId).tmp-\(suffix)", isDirectory: true)
+        let backup = canonicalBase.appendingPathComponent(".\(skillId).bak-\(suffix)", isDirectory: true)
+        let oldLock = try await lockFile.read()
+
+        // 复制到 staging（去掉 `.git` 避免把 repo 历史带进 skill 目录）。失败时旧 canonical 不动。
+        do {
+            try directoryCopy(srcDir, tmp, [".git"])
+            guard fm.fileExists(atPath: tmp.appendingPathComponent("SKILL.md").path) else {
+                throw SkillportError.fileIO(path: tmp, reason: "staged skill missing SKILL.md")
+            }
+        } catch {
+            try? fm.removeItem(at: tmp)
+            throw error
+        }
 
         // 在 cached（有 .git）里算 hash；dest 没有 .git 算不了。
         let commitHash = try? await git.headHash(in: cached)
@@ -112,9 +127,6 @@ public actor SkillInstallerActor {
         let identity = SkillIdentity.compute(
             name: skillId, source: .github(owner: owner, repo: repo, ref: ref)
         )
-        if let commitHash {
-            try await cache.set(identity: identity, hash: commitHash)
-        }
         let now = Date()
         let locked = LockedSkill(
             name: skillId,
@@ -128,16 +140,56 @@ public actor SkillInstallerActor {
             dismissedUpdate: nil,
             lastSelectedAgents: installTo.isEmpty ? nil : installTo
         )
-        try await lockFile.upsert(locked)
-        var agents: Set<AgentID> = []
-        for agentID in installTo {
-            try await toggleAgent(name: skillId, agent: agentID, install: true, home: home)
-            agents.insert(agentID)
-        }
         let raw =
-            (try? String(contentsOf: dest.appendingPathComponent("SKILL.md"), encoding: .utf8))
+            (try? String(contentsOf: tmp.appendingPathComponent("SKILL.md"), encoding: .utf8))
             ?? ""
         let parsed = (try? SKILLMdParser.parse(raw)) ?? .init(metadata: SKILLMetadata(), body: raw)
+
+        let canonicalExisted = fm.fileExists(atPath: dest.path)
+        do {
+            if canonicalExisted {
+                try fm.moveItem(at: dest, to: backup)
+            }
+            try fm.moveItem(at: tmp, to: dest)
+        } catch {
+            if canonicalExisted, fm.fileExists(atPath: backup.path) {
+                try? fm.removeItem(at: dest)
+                try? fm.moveItem(at: backup, to: dest)
+            }
+            try? fm.removeItem(at: tmp)
+            throw error
+        }
+
+        var agents: Set<AgentID> = []
+        do {
+            try await lockFile.upsert(locked)
+            for agentID in installTo {
+                try await toggleAgent(name: skillId, agent: agentID, install: true, home: home)
+                agents.insert(agentID)
+            }
+        } catch {
+            try? await lockFile.write(oldLock)
+            for agentID in agents {
+                if let agentConfig = Agent.defaultAgents(home: home).first(where: { $0.id == agentID }) {
+                    let link = agentConfig.skillsDir.appendingPathComponent(skillId)
+                    try? await symlinker.removeInstallation(at: link, canonical: dest)
+                }
+            }
+            if canonicalExisted, fm.fileExists(atPath: backup.path) {
+                try? fm.removeItem(at: dest)
+                try? fm.moveItem(at: backup, to: dest)
+            } else {
+                try? fm.removeItem(at: dest)
+            }
+            throw error
+        }
+
+        if fm.fileExists(atPath: backup.path) {
+            try? fm.removeItem(at: backup)
+        }
+        if let commitHash {
+            try? await cache.set(identity: identity, hash: commitHash)
+        }
         return Skill(
             name: skillId,
             path: dest,
@@ -148,7 +200,7 @@ public actor SkillInstallerActor {
         )
     }
 
-    /// Remove from all agents (including copy-type installs), delete canonical files, drop lockfile entry.
+    /// Remove Skillport-managed symlinks, delete canonical files, drop lockfile entry.
     public func uninstall(name: String, home: URL) async throws {
         let canonical = home.appendingPathComponent(".agents/skills/\(name)")
         let fm = FileManager.default
@@ -254,7 +306,7 @@ public actor SkillInstallerActor {
     }
 
     /// 顶层复制，跳过 `excluding` 中的 entry 名（如 `.git`）。嵌套层级保持原样。
-    static func copyDirectory(from src: URL, to dest: URL, excluding excludes: Set<String>) throws {
+    public static func copyDirectory(from src: URL, to dest: URL, excluding excludes: Set<String>) throws {
         let fm = FileManager.default
         try fm.createDirectory(at: dest, withIntermediateDirectories: true)
         let entries = try fm.contentsOfDirectory(at: src, includingPropertiesForKeys: nil, options: [])

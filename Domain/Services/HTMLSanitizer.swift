@@ -58,10 +58,10 @@ public struct HTMLSanitizer {
                         }
                     }
                 }
-                if tag == "a", try el.hasAttr("href") {
+                if tag == "a", el.hasAttr("href") {
                     try el.attr("rel", "noopener noreferrer")
                 }
-                if tag == "img", try !el.hasAttr("alt") {
+                if tag == "img", !el.hasAttr("alt") {
                     try el.attr("alt", "")
                 }
             }

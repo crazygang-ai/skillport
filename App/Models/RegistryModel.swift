@@ -35,6 +35,7 @@ public final class RegistryModel {
     private let installHandler: InstallHandler
 
     private var debounceTask: Task<Void, Never>?
+    private var selectionToken: UUID?
 
     public init(
         registry: RegistryActor,
@@ -87,17 +88,29 @@ public final class RegistryModel {
     }
 
     public func select(id: String) async {
+        let token = UUID()
+        selectionToken = token
         selectedID = id
         rendered = .empty(reason: "Loading…")
         selectedAgentsForInstall = []
-        guard let skill = skills.first(where: { $0.id == id }) else { return }
+        guard let skill = skills.first(where: { $0.id == id }) else {
+            isContentLoading = false
+            return
+        }
         isContentLoading = true
-        defer { isContentLoading = false }
+        defer {
+            if isCurrentSelection(id: id, token: token) {
+                isContentLoading = false
+            }
+        }
         do {
             let raw = try await contentFetcher.fetchContent(
                 source: skill.source, skillId: skill.skillId)
-            rendered = try renderer.render(raw)
+            let next = try renderer.render(raw)
+            guard isCurrentSelection(id: id, token: token) else { return }
+            rendered = next
         } catch {
+            guard isCurrentSelection(id: id, token: token) else { return }
             lastError = String(describing: error)
             rendered = .empty(reason: "Failed to load")
         }
@@ -139,5 +152,9 @@ public final class RegistryModel {
                 await self.runSearchNow()
             }
         }
+    }
+
+    private func isCurrentSelection(id: String, token: UUID) -> Bool {
+        selectedID == id && selectionToken == token
     }
 }

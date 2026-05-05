@@ -63,10 +63,34 @@ struct SkillsModelTests {
         #expect(byID[.kiro]?.isInstalled == false)
     }
 
-    private func makeManager(home: URL) -> SkillManagerActor {
+    @Test("checkAllUpdates writes update statuses back into model skills")
+    func checkAllUpdatesWritesStatuses() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        try AgentsFS.createCanonicalSkill(in: dir.url, name: "alpha")
+        try AgentsFS.createCanonicalSkill(in: dir.url, name: "beta")
+        let checker = BatchUpdateCheckerActor(maxConcurrent: 2) { skill in
+            skill.name == "alpha" ? .available(remoteHash: "remote-alpha") : .upToDate
+        }
+        let manager = makeManager(home: dir.url, batchChecker: checker)
+        let model = SkillsModel(manager: manager, home: dir.url)
+        try await model.refresh()
+
+        _ = try await model.checkAllUpdates()
+
+        let byName = Dictionary(uniqueKeysWithValues: model.skills.map { ($0.name, $0.updateStatus) })
+        #expect(byName["alpha"] == .available(remoteHash: "remote-alpha"))
+        #expect(byName["beta"] == .upToDate)
+    }
+
+    private func makeManager(
+        home: URL,
+        batchChecker: BatchUpdateCheckerActor? = nil
+    ) -> SkillManagerActor {
         let lockPath = home.appendingPathComponent(".agents/.skill-lock.json")
         let cachePath = home.appendingPathComponent(".agents/.skillport-cache.json")
         let lockFile = LockFileActor(path: lockPath)
+        let updater = SkillUpdaterActor(git: GitActor(), cache: CommitHashCache(path: cachePath))
         return SkillManagerActor(
             scanner: SkillScannerActor(),
             installer: SkillInstallerActor(
@@ -75,10 +99,8 @@ struct SkillsModelTests {
                 lockFile: lockFile,
                 cache: CommitHashCache(path: cachePath)
             ),
-            updater: SkillUpdaterActor(git: GitActor(), cache: CommitHashCache(path: cachePath)),
-            batchChecker: BatchUpdateCheckerActor(
-                updater: SkillUpdaterActor(git: GitActor(), cache: CommitHashCache(path: cachePath))
-            ),
+            updater: updater,
+            batchChecker: batchChecker ?? BatchUpdateCheckerActor(updater: updater),
             watcher: FileWatcherActor(),
             lockFile: lockFile
         )

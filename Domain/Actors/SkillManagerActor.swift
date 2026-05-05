@@ -36,6 +36,10 @@ public actor SkillManagerActor {
         eventsContinuation.finish()
     }
 
+    public var isWatching: Bool {
+        watchTask != nil
+    }
+
     @discardableResult
     public func rescan(home: URL) async throws -> [Skill] {
         let scanned = try await scanner.scanAll(home: home)
@@ -43,7 +47,11 @@ public actor SkillManagerActor {
         // 合并后避免 installGitHub 之后 rescan 把 source 错误回退为 .local。
         let lock: LockFile
         do {
-            lock = try await lockFile.read()
+            let readResult = try await lockFile.readWithRecoveryNotice()
+            lock = readResult.lockFile
+            if let recoveryError = readResult.recoveryError {
+                eventsContinuation.yield(.error(recoveryError))
+            }
         } catch {
             let reason = (error as? SkillportError).map { "\($0)" } ?? "\(error)"
             eventsContinuation.yield(
@@ -141,6 +149,9 @@ public actor SkillManagerActor {
 
     public func checkAllUpdates(skills: [Skill]) async throws -> [SkillIdentity: UpdateStatus] {
         let results = try await batchChecker.checkAll(skills: skills)
+        for (id, status) in results {
+            eventsContinuation.yield(.skillUpdateStatusChanged(id: id, status: status))
+        }
         let available = results.values.filter {
             if case .available = $0 { return true }
             return false

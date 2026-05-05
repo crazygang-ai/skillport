@@ -39,6 +39,44 @@ struct SkillManagerActorTests {
         #expect(after.first?.installedAgents.contains(.cursor) == true)
     }
 
+    @Test("rescan emits invalidLockFile error when corrupt lockfile is recovered")
+    func corruptLockfileEmitsError() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        try AgentsFS.createCanonicalSkill(in: dir.url, name: "alpha")
+        let lockPath = dir.url.appendingPathComponent(".agents/.skill-lock.json")
+        try FileManager.default.createDirectory(
+            at: lockPath.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try "bad json".write(to: lockPath, atomically: true, encoding: .utf8)
+
+        let manager = makeManager(home: dir.url)
+        let events = await manager.events
+        let eventTask = Task { () -> SkillportError? in
+            for await event in events {
+                if case .error(let error) = event {
+                    return error
+                }
+            }
+            return nil
+        }
+
+        _ = try await manager.rescan(home: dir.url)
+        let error = await eventTask.value
+        #expect(error != nil)
+        if case .invalidLockFile = error {
+            // expected
+        } else {
+            Issue.record("expected invalidLockFile, got \(String(describing: error))")
+        }
+        let siblings = try FileManager.default.contentsOfDirectory(
+            at: lockPath.deletingLastPathComponent(),
+            includingPropertiesForKeys: nil
+        )
+        #expect(siblings.contains { $0.lastPathComponent.contains(".bak-") })
+    }
+
     private func makeManager(home: URL) -> SkillManagerActor {
         let lockPath = home.appendingPathComponent(".agents/.skill-lock.json")
         let cachePath = home.appendingPathComponent(".agents/.skillport-cache.json")

@@ -2,7 +2,9 @@ import Foundation
 import OSLog
 
 public actor RegistryActor {
-    private let session: URLSession
+    private let session: URLSession?
+    private let proxySettings: ProxySettingsActor?
+    private let keychain: KeychainActor?
     private let baseURL: URL
     private let cacheTTL: TimeInterval
     private var leaderboardCache: [LeaderboardCategory: (result: LeaderboardResult, at: Date)] = [:]
@@ -14,6 +16,21 @@ public actor RegistryActor {
         cacheTTL: TimeInterval = 5 * 60
     ) {
         self.session = session
+        self.proxySettings = nil
+        self.keychain = nil
+        self.baseURL = baseURL
+        self.cacheTTL = cacheTTL
+    }
+
+    public init(
+        proxySettings: ProxySettingsActor,
+        keychain: KeychainActor? = nil,
+        baseURL: URL = URL(string: "https://skills.sh")!,
+        cacheTTL: TimeInterval = 5 * 60
+    ) {
+        self.session = nil
+        self.proxySettings = proxySettings
+        self.keychain = keychain
         self.baseURL = baseURL
         self.cacheTTL = cacheTTL
     }
@@ -30,6 +47,7 @@ public actor RegistryActor {
         let url = baseURL.appendingPathComponent(path)
         var request = URLRequest(url: url)
         request.setValue("text/html", forHTTPHeaderField: "Accept")
+        let session = await sessionForRequest()
         let (data, response) = try await session.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
             throw SkillportError.networkFailed(url: url, reason: "status \(http.statusCode)")
@@ -63,6 +81,7 @@ public actor RegistryActor {
             URLQueryItem(name: "limit", value: String(clampedLimit)),
         ]
         let url = comps.url!
+        let session = await sessionForRequest()
         let (data, response) = try await session.data(from: url)
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
             throw SkillportError.networkFailed(url: url, reason: "status \(http.statusCode)")
@@ -102,5 +121,33 @@ public actor RegistryActor {
                 change: raw.change
             )
         }
+    }
+
+    public func currentConnectionProxySummary() async -> [String: String] {
+        if let session {
+            return NetworkSession.connectionProxySummary(
+                from: session.configuration.connectionProxyDictionary ?? [:])
+        }
+        guard let proxySettings else { return [:] }
+        let password = await proxyPassword()
+        let config = await proxySettings.current
+        return NetworkSession.connectionProxySummary(proxy: config, password: password)
+    }
+
+    private func sessionForRequest() async -> URLSession {
+        if let session {
+            return session
+        }
+        guard let proxySettings else {
+            return .shared
+        }
+        let password = await proxyPassword()
+        let config = await proxySettings.current
+        return NetworkSession.makeSession(proxy: config, password: password)
+    }
+
+    private func proxyPassword() async -> String? {
+        guard let keychain else { return nil }
+        return try? await keychain.get(account: ProxySettingsActor.proxyPasswordAccount)
     }
 }

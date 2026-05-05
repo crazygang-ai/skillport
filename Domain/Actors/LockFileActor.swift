@@ -1,6 +1,12 @@
 import Foundation
 
 public actor LockFileActor {
+    public struct ReadResult: Sendable {
+        public let lockFile: LockFile
+        public let recoveryError: SkillportError?
+        public let backupURL: URL?
+    }
+
     private let path: URL
 
     public init(path: URL) {
@@ -8,12 +14,25 @@ public actor LockFileActor {
     }
 
     public func read() throws -> LockFile {
+        let result = try readWithRecoveryNotice()
+        return result.lockFile
+    }
+
+    public func readWithRecoveryNotice() throws -> ReadResult {
         guard FileManager.default.fileExists(atPath: path.path) else {
-            return LockFile(version: LockFile.currentVersion, skills: [])
+            return ReadResult(
+                lockFile: LockFile(version: LockFile.currentVersion, skills: []),
+                recoveryError: nil,
+                backupURL: nil
+            )
         }
         let data = try Data(contentsOf: path)
         do {
-            return try LockFile.decode(from: data)
+            return ReadResult(
+                lockFile: try LockFile.decode(from: data),
+                recoveryError: nil,
+                backupURL: nil
+            )
         } catch {
             // 坏文件或不认识的 schema —— 把它挪到旁边 `.bak-<timestamp>` 备份，
             // 返回空 lockfile 让 UI 继续跑；下次 upsert 会写一份干净的。
@@ -21,7 +40,12 @@ public actor LockFileActor {
                 .replacingOccurrences(of: ":", with: "-")
             let backup = path.appendingPathExtension("bak-\(stamp)")
             try? FileManager.default.moveItem(at: path, to: backup)
-            return LockFile(version: LockFile.currentVersion, skills: [])
+            let reason = "\(error)"
+            return ReadResult(
+                lockFile: LockFile(version: LockFile.currentVersion, skills: []),
+                recoveryError: .invalidLockFile(reason: reason),
+                backupURL: backup
+            )
         }
     }
 

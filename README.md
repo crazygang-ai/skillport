@@ -31,6 +31,12 @@ Native macOS app for managing AI agent skills. Rewrite of [SkillPilot](https://g
 open Skillport.xcodeproj
 ```
 
+## Test
+
+```bash
+xcodebuild -scheme Skillport -derivedDataPath build/DerivedData -destination platform=macOS,arch=arm64 CODE_SIGNING_ALLOWED=NO test -quiet
+```
+
 ## Release
 
 See [docs/RELEASE-SETUP.md](docs/RELEASE-SETUP.md) for first-time Developer ID / notarize / Sparkle appcast setup.

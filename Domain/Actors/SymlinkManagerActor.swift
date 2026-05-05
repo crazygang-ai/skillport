@@ -70,11 +70,11 @@ public actor SymlinkManagerActor {
         return false
     }
 
-    /// 撤销某一处"安装"，不关心是 symlink 还是 copy：
+    /// 撤销某一处 Skillport 能证明由自己管理的"安装"：
     /// - 不存在：no-op。
     /// - 是 symlink 且指向 `canonical`：unlink。
     /// - 是 symlink 但指向其它：no-op（可能是用户手工建立的 link，不冒险）。
-    /// - 是真实文件 / 目录：识别为 copy-type，`rm -rf`。
+    /// - 是真实文件 / 目录：no-op（无法证明 ownership，不删除用户目录）。
     public func removeInstallation(at path: URL, canonical: URL) throws {
         let fm = FileManager.default
         if let raw = try? fm.destinationOfSymbolicLink(atPath: path.path) {
@@ -85,11 +85,6 @@ public actor SymlinkManagerActor {
                 try fm.removeItem(at: path)
             }
             return
-        }
-        var isDir: ObjCBool = false
-        if fm.fileExists(atPath: path.path, isDirectory: &isDir) {
-            // 普通文件或 copy-type 目录：直接删。调用方负责验证它是一个 skill 安装。
-            try fm.removeItem(at: path)
         }
     }
 }

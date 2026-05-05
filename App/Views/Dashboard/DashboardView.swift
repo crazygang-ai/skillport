@@ -105,7 +105,7 @@ struct DashboardView: View {
     private func loadFileURL(from provider: NSItemProvider) async throws -> URL {
         try await withCheckedThrowingContinuation { c in
             _ = provider.loadObject(ofClass: URL.self) { reading, error in
-                if let url = reading as? URL {
+                if let url = reading {
                     c.resume(returning: url)
                 } else {
                     c.resume(throwing: error ?? SkillportError.unexpected("no url"))

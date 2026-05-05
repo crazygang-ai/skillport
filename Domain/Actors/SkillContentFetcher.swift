@@ -4,7 +4,9 @@ import OSLog
 public actor SkillContentFetcher {
     public static let htmlPrefix = "<!-- HTML -->"
 
-    private let session: URLSession
+    private let session: URLSession?
+    private let proxySettings: ProxySettingsActor?
+    private let keychain: KeychainActor?
     private let rawBase: URL
     private let apiBase: URL
     private let skillsShBase: URL
@@ -23,6 +25,25 @@ public actor SkillContentFetcher {
         cacheTTL: TimeInterval = 10 * 60
     ) {
         self.session = session
+        self.proxySettings = nil
+        self.keychain = nil
+        self.rawBase = rawBase
+        self.apiBase = apiBase
+        self.skillsShBase = skillsShBase
+        self.cacheTTL = cacheTTL
+    }
+
+    public init(
+        proxySettings: ProxySettingsActor,
+        keychain: KeychainActor? = nil,
+        rawBase: URL = URL(string: "https://raw.githubusercontent.com")!,
+        apiBase: URL = URL(string: "https://api.github.com")!,
+        skillsShBase: URL = URL(string: "https://skills.sh")!,
+        cacheTTL: TimeInterval = 10 * 60
+    ) {
+        self.session = nil
+        self.proxySettings = proxySettings
+        self.keychain = keychain
         self.rawBase = rawBase
         self.apiBase = apiBase
         self.skillsShBase = skillsShBase
@@ -36,6 +57,7 @@ public actor SkillContentFetcher {
         guard !urls.isEmpty else {
             throw SkillportError.networkFailed(url: nil, reason: "no candidate urls")
         }
+        let session = await sessionForRequest()
         return try await withThrowingTaskGroup(of: Data?.self) { group in
             for url in urls {
                 group.addTask { [session] in
@@ -135,6 +157,7 @@ public actor SkillContentFetcher {
         req.setValue("1", forHTTPHeaderField: "RSC")
         req.setValue("%5B%22%22%5D", forHTTPHeaderField: "Next-Router-State-Tree")
         req.timeoutInterval = 10
+        let session = await sessionForRequest()
         let (data, resp) = try await session.data(for: req)
         if let http = resp as? HTTPURLResponse, http.statusCode != 200 {
             throw SkillportError.networkFailed(url: url, reason: "status \(http.statusCode)")
@@ -192,6 +215,7 @@ public actor SkillContentFetcher {
             req.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
             req.timeoutInterval = 15
             do {
+                let session = await sessionForRequest()
                 let (data, resp) = try await session.data(for: req)
                 if let http = resp as? HTTPURLResponse {
                     updateRateLimit(from: http)
@@ -234,6 +258,34 @@ public actor SkillContentFetcher {
             }
         }
         throw SkillportError.networkFailed(url: nil, reason: "tree api found nothing")
+    }
+
+    public func currentConnectionProxySummary() async -> [String: String] {
+        if let session {
+            return NetworkSession.connectionProxySummary(
+                from: session.configuration.connectionProxyDictionary ?? [:])
+        }
+        guard let proxySettings else { return [:] }
+        let password = await proxyPassword()
+        let config = await proxySettings.current
+        return NetworkSession.connectionProxySummary(proxy: config, password: password)
+    }
+
+    private func sessionForRequest() async -> URLSession {
+        if let session {
+            return session
+        }
+        guard let proxySettings else {
+            return .shared
+        }
+        let password = await proxyPassword()
+        let config = await proxySettings.current
+        return NetworkSession.makeSession(proxy: config, password: password)
+    }
+
+    private func proxyPassword() async -> String? {
+        guard let keychain else { return nil }
+        return try? await keychain.get(account: ProxySettingsActor.proxyPasswordAccount)
     }
 
     private func updateRateLimit(from response: HTTPURLResponse) {

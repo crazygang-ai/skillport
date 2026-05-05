@@ -117,8 +117,8 @@ struct SymlinkManagerActorTests {
         #expect(fm.fileExists(atPath: link2.path))
     }
 
-    @Test("removeInstallation deletes a real directory (copy-type install)")
-    func removeInstallationCopyType() async throws {
+    @Test("removeInstallation leaves a real directory because ownership is unknown")
+    func removeInstallationLeavesRealDirectory() async throws {
         let dir = try TempDir.create()
         defer { try? dir.cleanup() }
         let canonical = try dir.mkdir("canonical")
@@ -129,7 +129,7 @@ struct SymlinkManagerActorTests {
         )
         let mgr = SymlinkManagerActor()
         try await mgr.removeInstallation(at: copyInstall, canonical: canonical)
-        #expect(!FileManager.default.fileExists(atPath: copyInstall.path))
+        #expect(FileManager.default.fileExists(atPath: copyInstall.path))
     }
 
     @Test("removeInstallation is no-op when path does not exist")

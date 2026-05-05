@@ -6,23 +6,24 @@ import Sparkle
 /// feedURL 默认从 Info.plist 的 `SUFeedURL` 读取；若为占位符（含 "YOUR_DOMAIN"）则禁用自动检查。
 @MainActor
 @Observable
-public final class AppUpdaterBridge {
+public final class AppUpdaterBridge: NSObject, SPUUpdaterDelegate {
     public private(set) var isUpdateAvailable: Bool = false
     public private(set) var latestCheckDate: Date?
     public let subsystemLabel: String = "sparkle"
 
-    private let controller: SPUStandardUpdaterController?
+    @ObservationIgnored private var controller: SPUStandardUpdaterController?
+    private let feedURLString: String?
 
     public init(feedURL: URL? = nil) {
         let effective = feedURL ?? Self.feedURLFromInfoPlist()
-        if let effective {
-            let controller = SPUStandardUpdaterController(
+        self.feedURLString = effective?.absoluteString
+        super.init()
+        if feedURLString != nil {
+            self.controller = SPUStandardUpdaterController(
                 startingUpdater: true,
-                updaterDelegate: nil,
+                updaterDelegate: self,
                 userDriverDelegate: nil
             )
-            controller.updater.setFeedURL(effective)
-            self.controller = controller
         } else {
             self.controller = nil
         }
@@ -43,5 +44,10 @@ public final class AppUpdaterBridge {
             return nil
         }
         return url
+    }
+
+    @objc(feedURLStringForUpdater:)
+    public func feedURLString(for _: SPUUpdater) -> String? {
+        feedURLString
     }
 }

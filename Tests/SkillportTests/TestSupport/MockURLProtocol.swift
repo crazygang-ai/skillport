@@ -22,7 +22,7 @@ public final class MockURLProtocol: URLProtocol {
 
     // MARK: - Thread-safe store (NSLock, no actor)
 
-    private nonisolated(unsafe) static let _lock = NSLock()
+    private static let _lock = NSLock()
     private nonisolated(unsafe) static var _handlers: [URL: Handler] = [:]
     private nonisolated(unsafe) static var _matchers: [(Matcher, Handler)] = []
     private nonisolated(unsafe) static var _requestLog: [URLRequest] = []

@@ -32,18 +32,7 @@ public struct AgentDetector: Sendable {
             let onPath = binaryOnPath(agentID: agent.id, in: searchPath)
             let configExists = agent.configDir.map { fm.fileExists(atPath: $0.path) } ?? false
             let skillsExists = fm.fileExists(atPath: agent.skillsDir.path)
-            let skillCount: Int
-            if skillsExists,
-                let entries = try? fm.contentsOfDirectory(
-                    at: agent.skillsDir,
-                    includingPropertiesForKeys: [.isDirectoryKey],
-                    options: [.skipsHiddenFiles]
-                )
-            {
-                skillCount = entries.count
-            } else {
-                skillCount = 0
-            }
+            let skillCount = skillsExists ? countValidSkills(in: agent.skillsDir) : 0
             result[agent.id] = AgentStatus(
                 binaryOnPath: onPath,
                 configDirExists: configExists,
@@ -69,6 +58,23 @@ public struct AgentDetector: Sendable {
             }
         }
         return false
+    }
+
+    private func countValidSkills(in skillsDir: URL) -> Int {
+        guard
+            let entries = try? FileManager.default.contentsOfDirectory(
+                at: skillsDir,
+                includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+                options: [.skipsHiddenFiles]
+            )
+        else { return 0 }
+        return entries.filter { entry in
+            guard !entry.lastPathComponent.hasPrefix(".") else { return false }
+            let resolved = entry.resolvingSymlinksInPath()
+            return FileManager.default.fileExists(
+                atPath: resolved.appendingPathComponent("SKILL.md").path
+            )
+        }.count
     }
 
     /// GUI apps on macOS inherit a minimal PATH (`/usr/bin:/bin:/usr/sbin:/sbin`) so

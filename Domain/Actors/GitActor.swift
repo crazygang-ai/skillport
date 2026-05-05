@@ -1,7 +1,13 @@
 import Foundation
 
 public actor GitActor {
-    public init() {}
+    private let proxySettings: ProxySettingsActor?
+    private let keychain: KeychainActor?
+
+    public init(proxySettings: ProxySettingsActor? = nil, keychain: KeychainActor? = nil) {
+        self.proxySettings = proxySettings
+        self.keychain = keychain
+    }
 
     @discardableResult
     public func headHash(in repo: URL) async throws -> String {
@@ -78,11 +84,15 @@ public actor GitActor {
     }
 
     private func run(_ args: [String], in cwd: URL?) async throws -> String {
-        try await withCheckedThrowingContinuation { continuation in
+        let environment = await processEnvironment()
+        return try await withCheckedThrowingContinuation { continuation in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
             process.arguments = ["git"] + args
             if let cwd { process.currentDirectoryURL = cwd }
+            if !environment.isEmpty {
+                process.environment = environment
+            }
 
             let stdout = Pipe()
             let stderr = Pipe()
@@ -141,6 +151,28 @@ public actor GitActor {
                 )
             }
         }
+    }
+
+    public func effectiveProxyEnvironmentForTesting(password: String? = nil) async -> [String: String] {
+        guard let proxySettings else { return [:] }
+        return await proxySettings.proxyEnvironment(password: password)
+    }
+
+    private func processEnvironment() async -> [String: String] {
+        guard let proxySettings else { return [:] }
+        let password: String?
+        if let keychain {
+            password = try? await keychain.get(account: ProxySettingsActor.proxyPasswordAccount)
+        } else {
+            password = nil
+        }
+        let proxyEnv = await proxySettings.proxyEnvironment(password: password)
+        guard !proxyEnv.isEmpty else { return [:] }
+        var environment = ProcessInfo.processInfo.environment
+        for (key, value) in proxyEnv {
+            environment[key] = value
+        }
+        return environment
     }
 }
 
