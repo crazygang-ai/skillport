@@ -119,6 +119,39 @@ struct SkillInstallerActorTests {
         #expect(FileManager.default.fileExists(atPath: userDir.appendingPathComponent("note.txt").path))
     }
 
+    @Test("installLocal rolls back canonical copy and lockfile when agent install fails")
+    func installLocalRollsBackOnAgentFailure() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let src = try dir.mkdir("rollback-local")
+        try "---\n---\n".write(
+            to: src.appendingPathComponent("SKILL.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        let home = try dir.mkdir("home")
+        let lockPath = home.appendingPathComponent(".agents/.skill-lock.json")
+        let blockingUserDir = home.appendingPathComponent(".kiro/skills/rollback-local")
+        try FileManager.default.createDirectory(at: blockingUserDir, withIntermediateDirectories: true)
+
+        let installer = SkillInstallerActor(
+            git: GitActor(),
+            symlinker: SymlinkManagerActor(),
+            lockFile: LockFileActor(path: lockPath),
+            cache: CommitHashCache(path: home.appendingPathComponent(".agents/.skillport-cache.json"))
+        )
+
+        await #expect(throws: SkillportError.self) {
+            _ = try await installer.installLocal(from: src, home: home, installTo: [.kiro])
+        }
+
+        let canonical = home.appendingPathComponent(".agents/skills/rollback-local")
+        #expect(!FileManager.default.fileExists(atPath: canonical.path))
+        #expect(FileManager.default.fileExists(atPath: blockingUserDir.path))
+        let lock = try LockFile.decode(from: Data(contentsOf: lockPath))
+        #expect(lock.skills.isEmpty)
+    }
+
     @Test("uninstall removes canonical and managed symlink but leaves same-name real agent-local directory")
     func uninstallLeavesUserDirectory() async throws {
         let dir = try TempDir.create()

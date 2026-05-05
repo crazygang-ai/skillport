@@ -115,6 +115,70 @@ struct RegistryModelTests {
         #expect(model.skills[0].skillId == "y")
     }
 
+    @Test("slow leaderboard response does not overwrite newer search results")
+    func slowLeaderboardDoesNotOverwriteSearch() async throws {
+        let model = makeModel()
+        let fixtureURL = try #require(
+            TestBundleLocator.bundle.url(
+                forResource: "skills-sh-leaderboard-alltime", withExtension: "html"))
+        let html = try String(contentsOf: fixtureURL, encoding: .utf8)
+        await MockURLProtocol.stub(
+            url: URL(string: "https://skills.sh/")!,
+            handler: { _ in
+                Thread.sleep(forTimeInterval: 0.25)
+                return .init(statusCode: 200, headers: [:], body: Data(html.utf8))
+            }
+        )
+        let json =
+            #"{"skills":[{"id":"owner/needle/needle","skillId":"needle","name":"needle","installs":1,"source":"owner/needle"}]}"#
+        MockURLProtocol.stub(
+            urlMatch: { $0.path == "/api/search" },
+            status: 200,
+            body: Data(json.utf8)
+        )
+
+        let leaderboard = Task { await model.loadLeaderboard() }
+        try await Task.sleep(nanoseconds: 50_000_000)
+        model.searchInput = "needle"
+        await model.runSearchNow()
+        await leaderboard.value
+
+        #expect(model.skills.count == 1)
+        #expect(model.skills.first?.skillId == "needle")
+        #expect(model.totalCount == 1)
+    }
+
+    @Test("slow search response does not overwrite newer search results")
+    func slowSearchDoesNotOverwriteNewerSearch() async throws {
+        let model = makeModel()
+        MockURLProtocol.stub(
+            urlMatch: { $0.path == "/api/search" },
+            handler: { request in
+                let query = request.url?.query ?? ""
+                if query.contains("slow") {
+                    Thread.sleep(forTimeInterval: 0.25)
+                    let json =
+                        #"{"skills":[{"id":"owner/slow/slow","skillId":"slow","name":"slow","installs":1,"source":"owner/slow"}]}"#
+                    return .init(statusCode: 200, headers: [:], body: Data(json.utf8))
+                }
+                let json =
+                    #"{"skills":[{"id":"owner/fast/fast","skillId":"fast","name":"fast","installs":1,"source":"owner/fast"}]}"#
+                return .init(statusCode: 200, headers: [:], body: Data(json.utf8))
+            }
+        )
+
+        model.searchInput = "slow"
+        let slow = Task { await model.runSearchNow() }
+        try await Task.sleep(nanoseconds: 50_000_000)
+        model.searchInput = "fast"
+        await model.runSearchNow()
+        await slow.value
+
+        #expect(model.skills.count == 1)
+        #expect(model.skills.first?.skillId == "fast")
+        #expect(model.totalCount == 1)
+    }
+
     @Test("toggleAgentForInstall flips membership in selectedAgentsForInstall")
     func toggleAgent() async {
         let model = makeModel()

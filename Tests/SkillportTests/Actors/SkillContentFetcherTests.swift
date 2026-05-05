@@ -120,6 +120,46 @@ struct SkillContentFetcherCascadeTests {
         #expect(content.contains("# from tree"))
     }
 
+    @Test("strategy 3 matches SKILL.md by exact parent directory")
+    func strategy3TreeAPIAvoidsSubstringMatch() async throws {
+        MockURLProtocol.resetSync()
+        MockURLProtocol.stub(
+            urlMatch: {
+                $0.host == "raw.githubusercontent.com"
+                    && $0.path.hasSuffix("packages/django/SKILL.md")
+            },
+            status: 200,
+            body: Data("# wrong django doc".utf8)
+        )
+        MockURLProtocol.stub(
+            urlMatch: {
+                $0.host == "raw.githubusercontent.com"
+                    && $0.path.hasSuffix("packages/go/SKILL.md")
+            },
+            status: 200,
+            body: Data("# correct go doc".utf8)
+        )
+        MockURLProtocol.stub(
+            urlMatch: { $0.host == "raw.githubusercontent.com" },
+            status: 404,
+            body: Data()
+        )
+        MockURLProtocol.stub(urlMatch: { $0.host == "skills.sh" }, status: 404, body: Data())
+        let tree =
+            #"{"tree":[{"path":"packages/django/SKILL.md","type":"blob"},{"path":"packages/go/SKILL.md","type":"blob"}]}"#
+        MockURLProtocol.stub(
+            urlMatch: { $0.host == "api.github.com" && $0.path.hasSuffix("git/trees/main") },
+            status: 200,
+            body: Data(tree.utf8)
+        )
+
+        let fetcher = SkillContentFetcher(session: MockURLProtocol.makeSession())
+        let content = try await fetcher.fetchContent(source: "owner/repo", skillId: "go")
+
+        #expect(content.contains("# correct go doc"))
+        #expect(!content.contains("django"))
+    }
+
     @Test("content is cached for subsequent calls within TTL")
     func cacheHit() async throws {
         MockURLProtocol.resetSync()

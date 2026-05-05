@@ -12,6 +12,7 @@ public actor SkillManagerActor {
     private let lockFile: LockFileActor
 
     private var watchTask: Task<Void, Never>?
+    private var updateStatuses: [SkillIdentity: UpdateStatus] = [:]
 
     public init(
         scanner: SkillScannerActor,
@@ -63,16 +64,20 @@ public actor SkillManagerActor {
             uniqueKeysWithValues: lock.skills.map { ($0.name, $0.source) }
         )
         let merged: [Skill] = scanned.map { s in
-            guard let realSource = sourceByName[s.name] else { return s }
+            let realSource = sourceByName[s.name] ?? s.source
+            let id = SkillIdentity.compute(name: s.name, source: realSource)
+            let updateStatus = updateStatuses[id] ?? s.updateStatus
             return Skill(
                 name: s.name,
                 path: s.path,
                 source: realSource,
                 frontmatter: s.frontmatter,
                 installedAgents: s.installedAgents,
-                updateStatus: s.updateStatus
+                updateStatus: updateStatus
             )
         }
+        let currentIDs = Set(merged.map(\.id))
+        updateStatuses = updateStatuses.filter { currentIDs.contains($0.key) }
         eventsContinuation.yield(.skillsReloaded(skills: merged))
         return merged
     }
@@ -124,6 +129,7 @@ public actor SkillManagerActor {
 
     public func installLocal(from source: URL, home: URL, installTo: Set<AgentID>) async throws -> Skill {
         let skill = try await installer.installLocal(from: source, home: home, installTo: installTo)
+        updateStatuses[skill.id] = skill.updateStatus
         _ = try await rescan(home: home)
         return skill
     }
@@ -138,6 +144,7 @@ public actor SkillManagerActor {
             skillId: skillId,
             home: home, installTo: installTo
         )
+        updateStatuses[skill.id] = skill.updateStatus
         _ = try await rescan(home: home)
         return skill
     }
@@ -150,6 +157,7 @@ public actor SkillManagerActor {
     public func checkAllUpdates(skills: [Skill]) async throws -> [SkillIdentity: UpdateStatus] {
         let results = try await batchChecker.checkAll(skills: skills)
         for (id, status) in results {
+            updateStatuses[id] = status
             eventsContinuation.yield(.skillUpdateStatusChanged(id: id, status: status))
         }
         let available = results.values.filter {
@@ -186,6 +194,7 @@ public actor SkillManagerActor {
         )
         try await lockFile.upsert(updated)
         let id = SkillIdentity.compute(name: name, source: locked.source)
+        updateStatuses[id] = .upToDate
         eventsContinuation.yield(.skillUpdateStatusChanged(id: id, status: .upToDate))
         _ = try await rescan(home: home)
     }
@@ -211,6 +220,7 @@ public actor SkillManagerActor {
         )
         try await lockFile.upsert(updated)
         let id = SkillIdentity.compute(name: name, source: locked.source)
+        updateStatuses[id] = .upToDate
         eventsContinuation.yield(.skillUpdateStatusChanged(id: id, status: .upToDate))
     }
 }

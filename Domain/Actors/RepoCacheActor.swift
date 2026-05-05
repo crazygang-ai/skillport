@@ -32,11 +32,12 @@ public actor RepoCacheActor {
             let gitDir = dest.appendingPathComponent(".git")
             let isCached = fm.fileExists(atPath: gitDir.path)
             if isCached {
-                // 复用：fetch + 强制同步到 origin 的 ref。
+                // 复用：fetch + 强制同步到刚取回的 ref。
+                // `FETCH_HEAD` 同时支持 branch 和 tag；`origin/<ref>` 只适用于 branch。
                 // 如果 fetch/reset 失败 —— 不盲目 re-clone（可能在网络故障时把本地缓存
                 // 也清掉），直接抛错让调用方处理（比如 Updater.checkStatus 回落到弱判断）。
                 try await git.fetch(in: dest, ref: Self.normalizedRemoteRef(ref))
-                try await git.resetHard(in: dest, ref: Self.targetRef(ref))
+                try await git.resetHard(in: dest, ref: "FETCH_HEAD")
             } else {
                 // 确保目录为空
                 if fm.fileExists(atPath: dest.path) {
@@ -73,10 +74,4 @@ public actor RepoCacheActor {
         return trimmed
     }
 
-    /// `git reset --hard` 的目标。空/HEAD 用 `FETCH_HEAD`；显式 ref 用 `origin/<ref>`。
-    private static func targetRef(_ ref: String) -> String {
-        let trimmed = ref.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty || trimmed == "HEAD" { return "FETCH_HEAD" }
-        return "origin/\(trimmed)"
-    }
 }

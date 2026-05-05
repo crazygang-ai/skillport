@@ -17,7 +17,9 @@ public final class RegistryModel {
     }
     public var category: LeaderboardCategory = .allTime {
         didSet {
-            Task { await loadLeaderboard() }
+            if trimmedSearchInput.isEmpty {
+                Task { await loadLeaderboard() }
+            }
         }
     }
     public var skills: [RegistrySkill] = []
@@ -36,6 +38,7 @@ public final class RegistryModel {
 
     private var debounceTask: Task<Void, Never>?
     private var selectionToken: UUID?
+    private var listToken: UUID?
 
     public init(
         registry: RegistryActor,
@@ -54,14 +57,24 @@ public final class RegistryModel {
     }
 
     public func loadLeaderboard() async {
+        let token = beginListRequest()
+        let requestedCategory = category
         isLoading = true
         lastError = nil
-        defer { isLoading = false }
+        defer { finishListRequest(token) }
         do {
-            let result = try await registry.leaderboard(category)
+            let result = try await registry.leaderboard(requestedCategory)
+            guard isCurrentListRequest(token),
+                category == requestedCategory,
+                trimmedSearchInput.isEmpty
+            else { return }
             skills = result.skills
             totalCount = result.totalCount
         } catch {
+            guard isCurrentListRequest(token),
+                category == requestedCategory,
+                trimmedSearchInput.isEmpty
+            else { return }
             lastError = String(describing: error)
             skills = []
             totalCount = 0
@@ -69,19 +82,22 @@ public final class RegistryModel {
     }
 
     public func runSearchNow() async {
-        let q = searchInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let q = trimmedSearchInput
         guard !q.isEmpty else {
             await loadLeaderboard()
             return
         }
+        let token = beginListRequest()
         isLoading = true
         lastError = nil
-        defer { isLoading = false }
+        defer { finishListRequest(token) }
         do {
             let results = try await registry.search(query: q)
+            guard isCurrentListRequest(token), trimmedSearchInput == q else { return }
             skills = results
             totalCount = results.count
         } catch {
+            guard isCurrentListRequest(token), trimmedSearchInput == q else { return }
             lastError = String(describing: error)
             skills = []
         }
@@ -156,5 +172,24 @@ public final class RegistryModel {
 
     private func isCurrentSelection(id: String, token: UUID) -> Bool {
         selectedID == id && selectionToken == token
+    }
+
+    private var trimmedSearchInput: String {
+        searchInput.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func beginListRequest() -> UUID {
+        let token = UUID()
+        listToken = token
+        return token
+    }
+
+    private func isCurrentListRequest(_ token: UUID) -> Bool {
+        listToken == token
+    }
+
+    private func finishListRequest(_ token: UUID) {
+        guard isCurrentListRequest(token) else { return }
+        isLoading = false
     }
 }

@@ -33,6 +33,7 @@ public actor SkillInstallerActor {
 
     @discardableResult
     public func installLocal(from source: URL, home: URL, installTo: Set<AgentID>) async throws -> Skill {
+        let oldLock = try await lockFile.read()
         let canonical = try localImporter.importSkill(from: source, home: home)
         let name = canonical.lastPathComponent
         let skillSource = SkillSource.local(path: source)
@@ -48,12 +49,24 @@ public actor SkillInstallerActor {
             dismissedUpdate: nil,
             lastSelectedAgents: installTo.isEmpty ? nil : installTo
         )
-        try await lockFile.upsert(locked)
 
         var agents: Set<AgentID> = []
-        for agentID in installTo {
-            try await toggleAgent(name: name, agent: agentID, install: true, home: home)
-            agents.insert(agentID)
+        do {
+            try await lockFile.upsert(locked)
+            for agentID in installTo {
+                try await toggleAgent(name: name, agent: agentID, install: true, home: home)
+                agents.insert(agentID)
+            }
+        } catch {
+            try? await lockFile.write(oldLock)
+            for agentID in agents {
+                if let agentConfig = Agent.defaultAgents(home: home).first(where: { $0.id == agentID }) {
+                    let link = agentConfig.skillsDir.appendingPathComponent(name)
+                    try? await symlinker.removeInstallation(at: link, canonical: canonical)
+                }
+            }
+            try? FileManager.default.removeItem(at: canonical)
+            throw error
         }
 
         let raw = (try? String(contentsOf: canonical.appendingPathComponent("SKILL.md"), encoding: .utf8)) ?? ""

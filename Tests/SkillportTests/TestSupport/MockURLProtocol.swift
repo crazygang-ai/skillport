@@ -105,16 +105,17 @@ public final class MockURLProtocol: URLProtocol {
         let request = self.request
         let url = request.url ?? URL(fileURLWithPath: "/")
 
-        let resp: Response = Self._lock.withLock {
+        let handler: Handler? = Self._lock.withLock {
             Self._requestLog.append(request)
             if let handler = Self._handlers[url] {
-                return handler(request)
+                return handler
             }
             for (matcher, handler) in Self._matchers where matcher(url) {
-                return handler(request)
+                return handler
             }
-            return Response(statusCode: 404, headers: [:], body: Data())
+            return nil
         }
+        let resp = handler?(request) ?? Response(statusCode: 404, headers: [:], body: Data())
 
         let http = HTTPURLResponse(
             url: url,

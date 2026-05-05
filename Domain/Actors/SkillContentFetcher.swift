@@ -235,7 +235,11 @@ public actor SkillContentFetcher {
                 guard
                     let match = parsed.tree?.first(where: {
                         $0.type == "blob" && $0.path.hasSuffix("SKILL.md")
-                            && $0.path.contains(skillId)
+                            && Self.treeAPIPathMatchesSkill(
+                                path: $0.path,
+                                skillId: skillId,
+                                source: source
+                            )
                     })
                 else { continue }
                 let rawURL =
@@ -258,6 +262,16 @@ public actor SkillContentFetcher {
             }
         }
         throw SkillportError.networkFailed(url: nil, reason: "tree api found nothing")
+    }
+
+    private static func treeAPIPathMatchesSkill(path: String, skillId: String, source: String) -> Bool {
+        let components = path.split(separator: "/").map(String.init)
+        guard components.last == "SKILL.md" else { return false }
+        let parents = components.dropLast()
+        if parents.isEmpty {
+            return source.split(separator: "/").last.map(String.init) == skillId
+        }
+        return parents.last == skillId
     }
 
     public func currentConnectionProxySummary() async -> [String: String] {

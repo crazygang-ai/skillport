@@ -77,10 +77,33 @@ struct SkillManagerActorTests {
         #expect(siblings.contains { $0.lastPathComponent.contains(".bak-") })
     }
 
-    private func makeManager(home: URL) -> SkillManagerActor {
+    @Test("rescan preserves update statuses computed by update checks")
+    func rescanPreservesUpdateStatus() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        try AgentsFS.createCanonicalSkill(in: dir.url, name: "alpha")
+        let manager = makeManager(home: dir.url) { skill in
+            skill.name == "alpha" ? .available(remoteHash: "remote-alpha") : .upToDate
+        }
+
+        let initial = try await manager.rescan(home: dir.url)
+        _ = try await manager.checkAllUpdates(skills: initial)
+        let after = try await manager.rescan(home: dir.url)
+
+        #expect(after.first?.updateStatus == .available(remoteHash: "remote-alpha"))
+    }
+
+    private func makeManager(
+        home: URL,
+        checkStatus: (@Sendable (Skill) async throws -> UpdateStatus)? = nil
+    ) -> SkillManagerActor {
         let lockPath = home.appendingPathComponent(".agents/.skill-lock.json")
         let cachePath = home.appendingPathComponent(".agents/.skillport-cache.json")
         let lockFile = LockFileActor(path: lockPath)
+        let updater = SkillUpdaterActor(
+            git: GitActor(),
+            cache: CommitHashCache(path: cachePath)
+        )
         return SkillManagerActor(
             scanner: SkillScannerActor(),
             installer: SkillInstallerActor(
@@ -89,16 +112,9 @@ struct SkillManagerActorTests {
                 lockFile: lockFile,
                 cache: CommitHashCache(path: cachePath)
             ),
-            updater: SkillUpdaterActor(
-                git: GitActor(),
-                cache: CommitHashCache(path: cachePath)
-            ),
-            batchChecker: BatchUpdateCheckerActor(
-                updater: SkillUpdaterActor(
-                    git: GitActor(),
-                    cache: CommitHashCache(path: cachePath)
-                )
-            ),
+            updater: updater,
+            batchChecker: checkStatus.map { BatchUpdateCheckerActor(checkStatus: $0) }
+                ?? BatchUpdateCheckerActor(updater: updater),
             watcher: FileWatcherActor(),
             lockFile: lockFile
         )
