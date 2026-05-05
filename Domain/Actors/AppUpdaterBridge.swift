@@ -9,9 +9,11 @@ import Sparkle
 public final class AppUpdaterBridge: NSObject, SPUUpdaterDelegate {
     public private(set) var isUpdateAvailable: Bool = false
     public private(set) var latestCheckDate: Date?
+    public private(set) var automaticallyChecksForUpdates: Bool = false
     public let subsystemLabel: String = "sparkle"
 
     @ObservationIgnored private var controller: SPUStandardUpdaterController?
+    @ObservationIgnored public var onStateChanged: (@MainActor @Sendable (Bool, Date?) -> Void)?
     private let feedURLString: String?
 
     public init(feedURL: URL? = nil) {
@@ -24,6 +26,8 @@ public final class AppUpdaterBridge: NSObject, SPUUpdaterDelegate {
                 updaterDelegate: self,
                 userDriverDelegate: nil
             )
+            self.automaticallyChecksForUpdates =
+                self.controller?.updater.automaticallyChecksForUpdates ?? false
         } else {
             self.controller = nil
         }
@@ -32,6 +36,36 @@ public final class AppUpdaterBridge: NSObject, SPUUpdaterDelegate {
     public func checkForUpdates() {
         controller?.updater.checkForUpdates()
         latestCheckDate = Date()
+        publishState()
+    }
+
+    public func checkForUpdateInformation() {
+        controller?.updater.checkForUpdateInformation()
+        latestCheckDate = Date()
+        publishState()
+    }
+
+    public func setAutomaticallyChecksForUpdates(_ enabled: Bool) {
+        automaticallyChecksForUpdates = enabled
+        controller?.updater.automaticallyChecksForUpdates = enabled
+        publishState()
+    }
+
+    func recordUpdateAvailability(_ available: Bool) {
+        isUpdateAvailable = available
+        publishState()
+    }
+
+    public func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        recordUpdateAvailability(true)
+    }
+
+    public func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
+        recordUpdateAvailability(false)
+    }
+
+    public func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: any Error) {
+        recordUpdateAvailability(false)
     }
 
     /// Read SUFeedURL from Info.plist; return nil for placeholder or missing entries.
@@ -49,5 +83,9 @@ public final class AppUpdaterBridge: NSObject, SPUUpdaterDelegate {
     @objc(feedURLStringForUpdater:)
     public func feedURLString(for _: SPUUpdater) -> String? {
         feedURLString
+    }
+
+    private func publishState() {
+        onStateChanged?(isUpdateAvailable, latestCheckDate)
     }
 }

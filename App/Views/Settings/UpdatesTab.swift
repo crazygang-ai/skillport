@@ -5,11 +5,10 @@ struct UpdatesTab: View {
     @Environment(UpdateModel.self) private var update
 
     var body: some View {
-        @Bindable var settings = settings
         Form {
             Toggle(
                 String(localized: "Automatically check for updates"),
-                isOn: $settings.autoCheckUpdates
+                isOn: autoCheckBinding
             )
             HStack {
                 if let last = update.lastCheck {
@@ -34,5 +33,18 @@ struct UpdatesTab: View {
         }
         .formStyle(.grouped)
         .padding()
+        .task {
+            update.setAutomaticallyChecksForUpdates(settings.autoCheckUpdates)
+        }
+    }
+
+    private var autoCheckBinding: Binding<Bool> {
+        Binding(
+            get: { settings.autoCheckUpdates },
+            set: { enabled in
+                settings.autoCheckUpdates = enabled
+                update.setAutomaticallyChecksForUpdates(enabled)
+            }
+        )
     }
 }

@@ -291,9 +291,11 @@ public actor SkillInstallerActor {
                 result.append(dir)
                 return
             }
-            guard let entries = try? fm.contentsOfDirectory(
-                at: dir, includingPropertiesForKeys: [.isDirectoryKey], options: []
-            ) else { return }
+            guard
+                let entries = try? fm.contentsOfDirectory(
+                    at: dir, includingPropertiesForKeys: [.isDirectoryKey], options: []
+                )
+            else { return }
             for entry in entries {
                 var isDir: ObjCBool = false
                 guard fm.fileExists(atPath: entry.path, isDirectory: &isDir), isDir.boolValue
@@ -321,6 +323,12 @@ public actor SkillInstallerActor {
     /// 顶层复制，跳过 `excluding` 中的 entry 名（如 `.git`）。嵌套层级保持原样。
     public static func copyDirectory(from src: URL, to dest: URL, excluding excludes: Set<String>) throws {
         let fm = FileManager.default
+        if let symlink = try firstIncludedSymlink(in: src, excludingTopLevelNames: excludes) {
+            throw SkillportError.fileIO(
+                path: symlink,
+                reason: "remote skill refuses source trees containing symlinks"
+            )
+        }
         try fm.createDirectory(at: dest, withIntermediateDirectories: true)
         let entries = try fm.contentsOfDirectory(at: src, includingPropertiesForKeys: nil, options: [])
         for entry in entries {
@@ -328,5 +336,51 @@ public actor SkillInstallerActor {
             let target = dest.appendingPathComponent(entry.lastPathComponent)
             try fm.copyItem(at: entry, to: target)
         }
+    }
+
+    private static func firstIncludedSymlink(
+        in url: URL,
+        excludingTopLevelNames excludes: Set<String>
+    ) throws -> URL? {
+        let values = try url.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey])
+        if values.isSymbolicLink == true {
+            return url
+        }
+        guard values.isDirectory == true else {
+            return nil
+        }
+        let entries = try FileManager.default.contentsOfDirectory(
+            at: url,
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+            options: []
+        )
+        for entry in entries {
+            if excludes.contains(entry.lastPathComponent) { continue }
+            if let symlink = try firstSymlink(in: entry) {
+                return symlink
+            }
+        }
+        return nil
+    }
+
+    private static func firstSymlink(in url: URL) throws -> URL? {
+        let values = try url.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey])
+        if values.isSymbolicLink == true {
+            return url
+        }
+        guard values.isDirectory == true else {
+            return nil
+        }
+        let entries = try FileManager.default.contentsOfDirectory(
+            at: url,
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+            options: []
+        )
+        for entry in entries {
+            if let symlink = try firstSymlink(in: entry) {
+                return symlink
+            }
+        }
+        return nil
     }
 }

@@ -17,6 +17,7 @@ struct SkillEditorView: View {
                 Divider()
                 CodeEditor(source: $source, language: .markdown, theme: .default)
                     .onChange(of: source) { _, new in
+                        guard state.body != new else { return }
                         state.body = new
                         state.isDirty = true
                     }

@@ -22,6 +22,29 @@ enum GitFixtures {
         return bareURL
     }
 
+    /// 造一个 bare repo，根目录的 SKILL.md 是 symlink。
+    static func makeBareRepoWithRootSKILLSymlink(under home: URL) throws -> URL {
+        let workDir = home.appendingPathComponent("repo-work-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
+        try "---\ndescription: symlink\n---\n# Root\n".write(
+            to: workDir.appendingPathComponent("real.md"), atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(
+            atPath: workDir.appendingPathComponent("SKILL.md").path,
+            withDestinationPath: "real.md"
+        )
+        try runGit(in: workDir, ["init", "-b", "main"])
+        try runGit(in: workDir, ["add", "."])
+        try runGit(
+            in: workDir,
+            [
+                "-c", "user.name=t", "-c", "user.email=t@t.t",
+                "commit", "-m", "init",
+            ])
+        let bareURL = home.appendingPathComponent("bare-\(UUID().uuidString).git")
+        try runGit(in: workDir, ["clone", "--bare", ".", bareURL.path])
+        return bareURL
+    }
+
     /// 造一个 bare repo，`skills/<sub>/SKILL.md` 布局。
     static func makeBareRepoWithSubSkills(under home: URL, subs: [String]) throws -> URL {
         let workDir = home.appendingPathComponent("repo-work-\(UUID().uuidString)")

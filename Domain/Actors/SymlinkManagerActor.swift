@@ -11,8 +11,17 @@ public actor SymlinkManagerActor {
         )
         if fm.fileExists(atPath: linkURL.path) {
             if let existing = try? fm.destinationOfSymbolicLink(atPath: linkURL.path) {
-                if existing == target.path { return }  // idempotent
-                try fm.removeItem(at: linkURL)
+                let existingURL =
+                    existing.hasPrefix("/")
+                    ? URL(fileURLWithPath: existing)
+                    : linkURL.deletingLastPathComponent().appendingPathComponent(existing)
+                if existingURL.resolvingSymlinksInPath().path == target.resolvingSymlinksInPath().path {
+                    return
+                }
+                throw SkillportError.fileIO(
+                    path: linkURL,
+                    reason: "path exists as a symlink to another target"
+                )
             } else {
                 throw SkillportError.fileIO(path: linkURL, reason: "path exists and is not a symlink")
             }
@@ -52,7 +61,8 @@ public actor SymlinkManagerActor {
         for fallback in fallbackChain {
             let candidate = fallback.appendingPathComponent(name)
             if let raw = try? fm.destinationOfSymbolicLink(atPath: candidate.path) {
-                let absolute = raw.hasPrefix("/")
+                let absolute =
+                    raw.hasPrefix("/")
                     ? URL(fileURLWithPath: raw)
                     : candidate.deletingLastPathComponent().appendingPathComponent(raw)
                 if absolute.resolvingSymlinksInPath().path == resolvedTarget {
@@ -78,7 +88,8 @@ public actor SymlinkManagerActor {
     public func removeInstallation(at path: URL, canonical: URL) throws {
         let fm = FileManager.default
         if let raw = try? fm.destinationOfSymbolicLink(atPath: path.path) {
-            let target = raw.hasPrefix("/")
+            let target =
+                raw.hasPrefix("/")
                 ? URL(fileURLWithPath: raw)
                 : path.deletingLastPathComponent().appendingPathComponent(raw)
             if target.resolvingSymlinksInPath().path == canonical.resolvingSymlinksInPath().path {

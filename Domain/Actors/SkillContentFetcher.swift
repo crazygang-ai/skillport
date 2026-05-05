@@ -93,25 +93,40 @@ public actor SkillContentFetcher {
             return cached.content
         }
 
+        var failures: [String] = []
+
         // Strategy 1: 8 个 raw URL 候选并发 race
-        if let raw = try? await fetchFromRawCandidates(source: source, skillId: skillId) {
+        do {
+            let raw = try await fetchFromRawCandidates(source: source, skillId: skillId)
             contentCache[cacheKey] = (raw, Date())
             return raw
+        } catch {
+            failures.append("raw candidates: \(error)")
         }
 
         // Strategy 2: skills.sh RSC payload → HTML
-        if let html = try? await fetchFromSkillsSh(source: source, skillId: skillId) {
+        do {
+            let html = try await fetchFromSkillsSh(source: source, skillId: skillId)
             let content = Self.htmlPrefix + html
             contentCache[cacheKey] = (content, Date())
             return content
+        } catch {
+            failures.append("skills.sh: \(error)")
         }
 
         // Strategy 3: GitHub Tree API discovery
-        if let tree = try? await discoverViaTreeAPI(source: source, skillId: skillId) {
+        do {
+            let tree = try await discoverViaTreeAPI(source: source, skillId: skillId)
             contentCache[cacheKey] = (tree, Date())
             return tree
+        } catch {
+            failures.append("github tree api: \(error)")
         }
-        return ""
+
+        throw SkillportError.networkFailed(
+            url: nil,
+            reason: "content unavailable for \(source)/\(skillId): \(failures.joined(separator: "; "))"
+        )
     }
 
     public func invalidateCache(source: String? = nil, skillId: String? = nil) {
@@ -220,7 +235,10 @@ public actor SkillContentFetcher {
                 if let http = resp as? HTTPURLResponse {
                     updateRateLimit(from: http)
                     if http.statusCode == 403 || http.statusCode == 429 {
-                        return ""  // treat as miss
+                        throw SkillportError.networkFailed(
+                            url: req.url,
+                            reason: "status \(http.statusCode)"
+                        )
                     }
                     if http.statusCode != 200 { continue }
                 }

@@ -33,8 +33,8 @@ struct SymlinkManagerActorTests {
         #expect(resolved == target.path)
     }
 
-    @Test("link replaces a link pointing elsewhere")
-    func replaceExisting() async throws {
+    @Test("link refuses a link pointing elsewhere")
+    func refusesExistingMismatchedSymlink() async throws {
         let dir = try TempDir.create()
         defer { try? dir.cleanup() }
         let t1 = try dir.mkdir("t1")
@@ -42,9 +42,11 @@ struct SymlinkManagerActorTests {
         let link = dir.url.appendingPathComponent("l")
         let mgr = SymlinkManagerActor()
         try await mgr.link(target: t1, at: link)
-        try await mgr.link(target: t2, at: link)
+        await #expect(throws: SkillportError.self) {
+            try await mgr.link(target: t2, at: link)
+        }
         let resolved = try FileManager.default.destinationOfSymbolicLink(atPath: link.path)
-        #expect(resolved == t2.path)
+        #expect(resolved == t1.path)
     }
 
     @Test("unlink removes only if it is a symlink pointing at expected target")

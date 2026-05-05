@@ -178,6 +178,23 @@ struct SkillContentFetcherCascadeTests {
         #expect(secondCount == 0)
     }
 
+    @Test("fetchContent throws when every strategy fails")
+    func allStrategiesFailThrows() async throws {
+        MockURLProtocol.resetSync()
+        MockURLProtocol.stub(
+            urlMatch: { $0.host == "raw.githubusercontent.com" },
+            status: 404,
+            body: Data()
+        )
+        MockURLProtocol.stub(urlMatch: { $0.host == "skills.sh" }, status: 404, body: Data())
+        MockURLProtocol.stub(urlMatch: { $0.host == "api.github.com" }, status: 404, body: Data())
+
+        let fetcher = SkillContentFetcher(session: MockURLProtocol.makeSession())
+        await #expect(throws: SkillportError.self) {
+            _ = try await fetcher.fetchContent(source: "owner/repo", skillId: "missing")
+        }
+    }
+
     @Test("GitHub API rate-limit response sets internal reset timer")
     func rateLimitBackoff() async throws {
         MockURLProtocol.resetSync()
