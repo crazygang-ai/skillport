@@ -1,5 +1,15 @@
 import Foundation
 
+public enum AgentAssignmentStatus: Sendable, Equatable, Hashable {
+    case direct
+    case inherited
+    case notAssigned
+
+    public var isAssigned: Bool {
+        self != .notAssigned
+    }
+}
+
 public struct AgentStatus: Sendable, Equatable, Hashable {
     public let binaryOnPath: Bool
     public let configDirExists: Bool
@@ -51,6 +61,30 @@ public struct Agent: Identifiable, Hashable, Sendable {
 
     /// Shorthand used by views that don't care which signal fired.
     public var isInstalled: Bool { status.isInstalled }
+
+    public func assignmentStatus(for skill: Skill) -> AgentAssignmentStatus {
+        assignmentStatus(forSkillAt: skill.path)
+    }
+
+    public func assignmentStatus(forSkillAt skillPath: URL) -> AgentAssignmentStatus {
+        let resolvedSkillPath = skillPath.resolvingSymlinksInPath().path
+        let skillName = skillPath.lastPathComponent
+        if Self.matches(
+            candidate: skillsDir.appendingPathComponent(skillName),
+            resolvedSkillPath: resolvedSkillPath
+        ) {
+            return .direct
+        }
+        for fallback in fallbackChain {
+            if Self.matches(
+                candidate: fallback.appendingPathComponent(skillName),
+                resolvedSkillPath: resolvedSkillPath
+            ) {
+                return .inherited
+            }
+        }
+        return .notAssigned
+    }
 
     /// 根据家目录 URL 构造 11 个 agent 的默认配置。
     /// status 统一设为 .uninstalled；实际检测结果由 `AgentDetector` 合并。
@@ -118,5 +152,21 @@ public struct Agent: Identifiable, Hashable, Sendable {
                 fallbackChain: [],
                 configDir: dir(".trae")),
         ]
+    }
+
+    private static func matches(candidate: URL, resolvedSkillPath: String) -> Bool {
+        let fm = FileManager.default
+        if let raw = try? fm.destinationOfSymbolicLink(atPath: candidate.path) {
+            let target =
+                raw.hasPrefix("/")
+                ? URL(fileURLWithPath: raw)
+                : candidate.deletingLastPathComponent().appendingPathComponent(raw)
+            return target.resolvingSymlinksInPath().path == resolvedSkillPath
+        }
+        var isDir: ObjCBool = false
+        if fm.fileExists(atPath: candidate.path, isDirectory: &isDir), isDir.boolValue {
+            return candidate.resolvingSymlinksInPath().path == resolvedSkillPath
+        }
+        return false
     }
 }

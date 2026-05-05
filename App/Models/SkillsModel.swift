@@ -26,7 +26,7 @@ public final class SkillsModel {
         self.home = home
         self.detector = detector
         self.notifications = notifications
-        self.agents = Agent.defaultAgents(home: home)
+        self.agents = Self.orderedAgents(Agent.defaultAgents(home: home))
         subscribe()
     }
 
@@ -126,6 +126,17 @@ public final class SkillsModel {
         return skills.filter { $0.installedAgents.contains(agent) }
     }
 
+    public func skillCount(for agent: AgentID) -> Int {
+        skills.filter { $0.installedAgents.contains(agent) }.count
+    }
+
+    public func isManagedSkill(_ skill: Skill) -> Bool {
+        let canonicalBase = home.appendingPathComponent(".agents/skills", isDirectory: true)
+            .resolvingSymlinksInPath().path
+        let skillPath = skill.path.resolvingSymlinksInPath().path
+        return skillPath == canonicalBase || skillPath.hasPrefix(canonicalBase + "/")
+    }
+
     private func applyUpdateStatuses(_ statuses: [SkillIdentity: UpdateStatus]) {
         for (id, status) in statuses {
             applyUpdateStatus(id: id, status: status)
@@ -138,14 +149,27 @@ public final class SkillsModel {
     }
 
     private static func agents(home: URL, statuses: [AgentID: AgentStatus]) -> [Agent] {
-        Agent.defaultAgents(home: home).map { a in
-            Agent(
-                id: a.id,
-                skillsDir: a.skillsDir,
-                fallbackChain: a.fallbackChain,
-                configDir: a.configDir,
-                status: statuses[a.id] ?? .uninstalled
-            )
-        }
+        orderedAgents(
+            Agent.defaultAgents(home: home).map { a in
+                Agent(
+                    id: a.id,
+                    skillsDir: a.skillsDir,
+                    fallbackChain: a.fallbackChain,
+                    configDir: a.configDir,
+                    status: statuses[a.id] ?? .uninstalled
+                )
+            }
+        )
+    }
+
+    private static func orderedAgents(_ agents: [Agent]) -> [Agent] {
+        agents.enumerated().sorted { lhs, rhs in
+            let lhsAvailable = lhs.element.isInstalled
+            let rhsAvailable = rhs.element.isInstalled
+            if lhsAvailable != rhsAvailable {
+                return lhsAvailable
+            }
+            return lhs.offset < rhs.offset
+        }.map(\.element)
     }
 }

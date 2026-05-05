@@ -29,7 +29,8 @@ struct SkillRow: View {
             }
             AgentsRow(
                 skill: skill,
-                installedAgentIDs: skillsModel.agents.filter(\.isInstalled).map(\.id),
+                agents: skillsModel.agents,
+                isManagedBySkillport: skillsModel.isManagedSkill(skill),
                 onToggle: onToggle
             )
         }
@@ -39,16 +40,18 @@ struct SkillRow: View {
 
 private struct AgentsRow: View {
     let skill: Skill
-    let installedAgentIDs: [AgentID]
+    let agents: [Agent]
+    let isManagedBySkillport: Bool
     let onToggle: (AgentID, Bool) -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
-            ForEach(installedAgentIDs, id: \.self) { id in
+        FlowLayout(spacing: 6) {
+            ForEach(agents, id: \.id) { agent in
                 AgentChip(
-                    agent: id,
-                    installed: skill.installedAgents.contains(id),
-                    onToggle: { install in onToggle(id, install) }
+                    agent: agent,
+                    assignment: agent.assignmentStatus(for: skill),
+                    isManagedBySkillport: isManagedBySkillport,
+                    onToggle: { install in onToggle(agent.id, install) }
                 )
             }
         }
@@ -56,23 +59,135 @@ private struct AgentsRow: View {
 }
 
 private struct AgentChip: View {
-    let agent: AgentID
-    let installed: Bool
+    let agent: Agent
+    let assignment: AgentAssignmentStatus
+    let isManagedBySkillport: Bool
     let onToggle: (Bool) -> Void
 
     var body: some View {
         Button {
-            onToggle(!installed)
+            onToggle(assignment == .notAssigned)
         } label: {
-            Text(agent.displayName)
-                .font(.caption)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(installed ? Color.accentColor.opacity(0.2) : Color.secondary.opacity(0.1))
-                .foregroundStyle(installed ? Color.accentColor : .secondary)
-                .clipShape(Capsule())
+            HStack(spacing: 4) {
+                Image(systemName: systemImage)
+                    .font(.caption2)
+                Text(agent.id.displayName)
+                    .font(.caption)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(background)
+            .foregroundStyle(foreground)
+            .clipShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help(installed ? "Uninstall from \(agent.displayName)" : "Install to \(agent.displayName)")
+        .disabled(!isActionable)
+        .opacity(agent.isInstalled ? 1 : 0.48)
+        .help(helpText)
+    }
+
+    private var isActionable: Bool {
+        guard isManagedBySkillport else { return false }
+        switch assignment {
+        case .direct:
+            return true
+        case .inherited:
+            return false
+        case .notAssigned:
+            return agent.isInstalled
+        }
+    }
+
+    private var systemImage: String {
+        switch assignment {
+        case .direct:
+            return "link"
+        case .inherited:
+            return "arrow.triangle.branch"
+        case .notAssigned:
+            return "circle"
+        }
+    }
+
+    private var background: Color {
+        switch assignment {
+        case .direct:
+            return Color.accentColor.opacity(0.2)
+        case .inherited:
+            return Color.secondary.opacity(0.12)
+        case .notAssigned:
+            return Color.secondary.opacity(0.08)
+        }
+    }
+
+    private var foreground: Color {
+        switch assignment {
+        case .direct:
+            return Color.accentColor
+        case .inherited:
+            return Color.secondary
+        case .notAssigned:
+            return agent.isInstalled ? Color.secondary : Color.secondary.opacity(0.75)
+        }
+    }
+
+    private var helpText: String {
+        let availability = agent.isInstalled ? "" : " CLI not detected on this Mac."
+        if !isManagedBySkillport {
+            return
+                "\(agent.id.displayName) assignment is external. Import the skill into Skillport before changing links.\(availability)"
+        }
+        switch assignment {
+        case .direct:
+            return "Unlink from \(agent.id.displayName).\(availability)"
+        case .inherited:
+            return "\(agent.id.displayName) inherits this skill through a fallback directory.\(availability)"
+        case .notAssigned:
+            if agent.isInstalled {
+                return "Link to \(agent.id.displayName)."
+            }
+            return "\(agent.id.displayName) is not detected on this Mac."
+        }
+    }
+}
+
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 4
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? 300
+        return layout(subviews: subviews, width: width).size
+    }
+
+    func placeSubviews(
+        in bounds: CGRect, proposal: ProposedViewSize,
+        subviews: Subviews, cache: inout ()
+    ) {
+        let result = layout(subviews: subviews, width: bounds.width)
+        for (sv, rect) in zip(subviews, result.rects) {
+            sv.place(
+                at: CGPoint(x: bounds.minX + rect.minX, y: bounds.minY + rect.minY),
+                proposal: .init(rect.size)
+            )
+        }
+    }
+
+    private func layout(subviews: Subviews, width: CGFloat) -> (rects: [CGRect], size: CGSize) {
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var rects: [CGRect] = []
+        for sv in subviews {
+            let s = sv.sizeThatFits(.unspecified)
+            if x + s.width > width, x > 0 {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            rects.append(CGRect(x: x, y: y, width: s.width, height: s.height))
+            x += s.width + spacing
+            rowHeight = max(rowHeight, s.height)
+        }
+        return (rects, CGSize(width: width, height: y + rowHeight))
     }
 }

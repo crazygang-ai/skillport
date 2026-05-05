@@ -38,7 +38,7 @@ extension AgentID {
         case .claudeCode: return "claude"
         case .codex: return "codex"
         case .gemini: return "gemini"
-        case .copilot: return "gh"
+        case .copilot: return "copilot"
         case .opencode: return "opencode"
         case .antigravity: return "antigravity"
         case .cursor: return "cursor"

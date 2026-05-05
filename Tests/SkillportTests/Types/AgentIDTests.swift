@@ -25,6 +25,13 @@ struct AgentIDTests {
         #expect(AgentID.trae.rawValue == "trae")
     }
 
+    @Test("Binary names use each agent CLI")
+    func binaryNames() {
+        #expect(AgentID.claudeCode.binaryName == "claude")
+        #expect(AgentID.codex.binaryName == "codex")
+        #expect(AgentID.copilot.binaryName == "copilot")
+    }
+
     @Test("Codable round-trip")
     func codable() throws {
         let encoded = try JSONEncoder().encode(AgentID.claudeCode)

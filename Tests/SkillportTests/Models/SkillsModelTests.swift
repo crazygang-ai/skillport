@@ -67,6 +67,29 @@ struct SkillsModelTests {
         #expect(byID[.codex]?.isInstalled == true)
         #expect(byID[.claudeCode]?.isInstalled == false)
         #expect(byID[.kiro]?.isInstalled == false)
+        #expect(model.agents.first?.id == .codex)
+    }
+
+    @Test("isManagedSkill distinguishes canonical and external agent skills")
+    func isManagedSkill() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        try AgentsFS.createCanonicalSkill(in: dir.url, name: "canonical")
+        _ = try AgentsFS.createForeignSkill(
+            in: dir.url,
+            agentRelativeSkillsDir: ".claude/skills",
+            name: "external"
+        )
+
+        let manager = makeManager(home: dir.url)
+        let model = SkillsModel(manager: manager, home: dir.url)
+        try await model.refresh()
+        let byName = Dictionary(uniqueKeysWithValues: model.skills.map { ($0.name, $0) })
+
+        let canonical = try #require(byName["canonical"])
+        let external = try #require(byName["external"])
+        #expect(model.isManagedSkill(canonical) == true)
+        #expect(model.isManagedSkill(external) == false)
     }
 
     @Test("checkAllUpdates writes update statuses back into model skills")

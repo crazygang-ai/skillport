@@ -54,4 +54,22 @@ struct AgentTests {
                 home.appendingPathComponent(".agents/skills"),
             ])
     }
+
+    @Test("assignmentStatus distinguishes direct, inherited, and not assigned")
+    func assignmentStatus() throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let skill = try AgentsFS.createCanonicalSkill(in: dir.url, name: "alpha")
+        try AgentsFS.installSymlink(
+            home: dir.url,
+            agentRelativeSkillsDir: ".claude/skills",
+            skillName: "alpha"
+        )
+        let agents = Agent.defaultAgents(home: dir.url)
+        let byID = Dictionary(uniqueKeysWithValues: agents.map { ($0.id, $0) })
+
+        #expect(byID[.claudeCode]?.assignmentStatus(forSkillAt: skill) == .direct)
+        #expect(byID[.codex]?.assignmentStatus(forSkillAt: skill) == .inherited)
+        #expect(byID[.kiro]?.assignmentStatus(forSkillAt: skill) == .notAssigned)
+    }
 }

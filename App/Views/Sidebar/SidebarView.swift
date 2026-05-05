@@ -14,18 +14,16 @@ struct SidebarView: View {
             }
 
             Section(String(localized: "Filter by agent")) {
-                let installedAgents = skillsModel.agents.filter(\.isInstalled)
                 if skillsModel.isDetectingAgents || !skillsModel.hasDetectedAgents {
                     Label(String(localized: "Detecting agents..."), systemImage: "hourglass")
                         .foregroundStyle(.secondary)
-                } else if installedAgents.isEmpty {
-                    Label(String(localized: "No agents detected"), systemImage: "questionmark.circle")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(installedAgents, id: \.id) { agent in
-                        Label(agent.id.displayName, systemImage: "cube")
-                            .tag(SidebarSelection.agent(agent.id))
-                    }
+                }
+                ForEach(skillsModel.agents, id: \.id) { agent in
+                    SidebarAgentRow(
+                        agent: agent,
+                        count: skillsModel.skillCount(for: agent.id)
+                    )
+                    .tag(SidebarSelection.agent(agent.id))
                 }
             }
         }
@@ -70,5 +68,26 @@ struct SidebarView: View {
                 }
             }
         )
+    }
+}
+
+private struct SidebarAgentRow: View {
+    let agent: Agent
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "circle.fill")
+                .font(.system(size: 8))
+                .foregroundStyle(agent.isInstalled ? Color.accentColor : Color.secondary.opacity(0.45))
+            Text(agent.id.displayName)
+                .foregroundStyle(agent.isInstalled ? Color.primary : Color.secondary)
+            Spacer()
+            Text("\(count)")
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+        }
+        .opacity(agent.isInstalled ? 1 : 0.55)
     }
 }

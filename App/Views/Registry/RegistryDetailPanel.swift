@@ -85,9 +85,8 @@ struct RegistryDetailPanel: View {
             Text(String(localized: "Install to agents"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            let installed = skills.agents.filter(\.isInstalled)
             RegistryAgentChipsFlow(
-                agents: installed,
+                agents: skills.agents,
                 selected: model.selectedAgentsForInstall
             ) { id in
                 model.toggleAgentForInstall(id)
@@ -151,48 +150,14 @@ struct RegistryAgentChipsFlow: View {
                         .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
+                .disabled(!agent.isInstalled)
+                .opacity(agent.isInstalled ? 1 : 0.48)
+                .help(
+                    agent.isInstalled
+                        ? "Install to \(agent.id.displayName)"
+                        : "\(agent.id.displayName) is not detected on this Mac."
+                )
             }
         }
-    }
-}
-
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 4
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? 300
-        return layout(subviews: subviews, width: width).size
-    }
-
-    func placeSubviews(
-        in bounds: CGRect, proposal: ProposedViewSize,
-        subviews: Subviews, cache: inout ()
-    ) {
-        let result = layout(subviews: subviews, width: bounds.width)
-        for (sv, rect) in zip(subviews, result.rects) {
-            sv.place(
-                at: CGPoint(x: bounds.minX + rect.minX, y: bounds.minY + rect.minY),
-                proposal: .init(rect.size)
-            )
-        }
-    }
-
-    private func layout(subviews: Subviews, width: CGFloat) -> (rects: [CGRect], size: CGSize) {
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        var rects: [CGRect] = []
-        for sv in subviews {
-            let s = sv.sizeThatFits(.unspecified)
-            if x + s.width > width, x > 0 {
-                x = 0
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            rects.append(CGRect(x: x, y: y, width: s.width, height: s.height))
-            x += s.width + spacing
-            rowHeight = max(rowHeight, s.height)
-        }
-        return (rects, CGSize(width: width, height: y + rowHeight))
     }
 }

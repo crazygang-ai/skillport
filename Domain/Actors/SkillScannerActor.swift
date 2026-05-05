@@ -74,45 +74,12 @@ public actor SkillScannerActor {
     ///            (soft inheritance; e.g. codex reads `.agents/skills` via fallback).
     private func detectInstalledAgents(home: URL, canonicalSkill: URL) -> Set<AgentID> {
         var result: Set<AgentID> = []
-        // Resolve /var -> /private/var (macOS symlink) so path comparison is reliable.
-        let resolvedCanonical = canonicalSkill.resolvingSymlinksInPath().path
-        let skillName = canonicalSkill.lastPathComponent
 
         for agent in Agent.defaultAgents(home: home) {
-            if matchesCanonical(
-                at: agent.skillsDir.appendingPathComponent(skillName),
-                canonical: resolvedCanonical
-            ) {
+            if agent.assignmentStatus(forSkillAt: canonicalSkill).isAssigned {
                 result.insert(agent.id)
-                continue
-            }
-            for fallback in agent.fallbackChain {
-                if matchesCanonical(
-                    at: fallback.appendingPathComponent(skillName),
-                    canonical: resolvedCanonical
-                ) {
-                    result.insert(agent.id)
-                    break
-                }
             }
         }
         return result
-    }
-
-    /// True when `candidate` exists (as symlink or real directory) and resolves to `canonical`.
-    private func matchesCanonical(at candidate: URL, canonical: String) -> Bool {
-        let fm = FileManager.default
-        if let raw = try? fm.destinationOfSymbolicLink(atPath: candidate.path) {
-            let target =
-                raw.hasPrefix("/")
-                ? URL(fileURLWithPath: raw)
-                : candidate.deletingLastPathComponent().appendingPathComponent(raw)
-            return target.resolvingSymlinksInPath().path == canonical
-        }
-        var isDir: ObjCBool = false
-        if fm.fileExists(atPath: candidate.path, isDirectory: &isDir), isDir.boolValue {
-            return candidate.resolvingSymlinksInPath().path == canonical
-        }
-        return false
     }
 }
