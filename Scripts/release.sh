@@ -33,7 +33,17 @@ fi
 # 3. Pre-flight: tests + lint + parity
 ./Scripts/check-parser-parity.sh
 swift-format lint --recursive App Domain Tests SkillportPreview
-xcodebuild -scheme Skillport -destination 'platform=macOS' test | xcpretty || {
+
+run_tests() {
+    if command -v xcpretty >/dev/null 2>&1; then
+        xcodebuild -scheme Skillport -destination 'platform=macOS' test | xcpretty
+    else
+        echo "==> xcpretty not found; running raw xcodebuild test output"
+        xcodebuild -scheme Skillport -destination 'platform=macOS' test
+    fi
+}
+
+run_tests || {
     echo "❌ Tests failed; aborting release"
     git checkout project.yml
     exit 1
@@ -67,5 +77,5 @@ echo "✅ Release v$VERSION built to $EXPORT_DIR/Skillport.app"
 echo ""
 echo "Next steps:"
 echo "  1. Notarize:       ./Scripts/notarize.sh \"$EXPORT_DIR/Skillport.app\""
-echo "  2. Publish appcast: ./Scripts/publish-appcast.sh \"$EXPORT_DIR\" $VERSION"
+echo "  2. Publish appcast: ./Scripts/publish-appcast.sh \"$EXPORT_DIR\" $VERSION $BUILD"
 echo "  3. Push:           git push && git push --tags"

@@ -52,15 +52,24 @@ public actor SkillInstallerActor {
         )
 
         var agents: Set<AgentID> = []
+        var createdAgentLinks: Set<AgentID> = []
         do {
             try await lockFile.upsert(locked)
-            for agentID in installTo {
+            for agentID in Self.orderedAgentIDs(installTo) {
+                let hadDirectLink = Self.directLinkMatchesCanonical(
+                    agentID: agentID, name: name, home: home, canonical: canonical)
                 try await toggleAgent(name: name, agent: agentID, install: true, home: home)
+                if !hadDirectLink,
+                    Self.directLinkMatchesCanonical(
+                        agentID: agentID, name: name, home: home, canonical: canonical)
+                {
+                    createdAgentLinks.insert(agentID)
+                }
                 agents.insert(agentID)
             }
         } catch {
             try? await lockFile.write(oldLock)
-            for agentID in agents {
+            for agentID in createdAgentLinks {
                 if let agentConfig = Agent.defaultAgents(home: home).first(where: { $0.id == agentID }) {
                     let link = agentConfig.skillsDir.appendingPathComponent(name)
                     try? await symlinker.removeInstallation(at: link, canonical: canonical)
@@ -175,15 +184,24 @@ public actor SkillInstallerActor {
         }
 
         var agents: Set<AgentID> = []
+        var createdAgentLinks: Set<AgentID> = []
         do {
             try await lockFile.upsert(locked)
-            for agentID in installTo {
+            for agentID in Self.orderedAgentIDs(installTo) {
+                let hadDirectLink = Self.directLinkMatchesCanonical(
+                    agentID: agentID, name: storageName, home: home, canonical: dest)
                 try await toggleAgent(name: storageName, agent: agentID, install: true, home: home)
+                if !hadDirectLink,
+                    Self.directLinkMatchesCanonical(
+                        agentID: agentID, name: storageName, home: home, canonical: dest)
+                {
+                    createdAgentLinks.insert(agentID)
+                }
                 agents.insert(agentID)
             }
         } catch {
             try? await lockFile.write(oldLock)
-            for agentID in agents {
+            for agentID in createdAgentLinks {
                 if let agentConfig = Agent.defaultAgents(home: home).first(where: { $0.id == agentID }) {
                     let link = agentConfig.skillsDir.appendingPathComponent(storageName)
                     try? await symlinker.removeInstallation(at: link, canonical: dest)
@@ -402,6 +420,32 @@ public actor SkillInstallerActor {
         (path ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+
+    private static func orderedAgentIDs(_ ids: Set<AgentID>) -> [AgentID] {
+        ids.sorted { $0.rawValue < $1.rawValue }
+    }
+
+    private static func directLinkMatchesCanonical(
+        agentID: AgentID,
+        name: String,
+        home: URL,
+        canonical: URL
+    ) -> Bool {
+        guard let agentConfig = Agent.defaultAgents(home: home).first(where: { $0.id == agentID })
+        else {
+            return false
+        }
+        let link = agentConfig.skillsDir.appendingPathComponent(name)
+        guard let rawTarget = try? FileManager.default.destinationOfSymbolicLink(atPath: link.path)
+        else {
+            return false
+        }
+        let target =
+            rawTarget.hasPrefix("/")
+            ? URL(fileURLWithPath: rawTarget)
+            : link.deletingLastPathComponent().appendingPathComponent(rawTarget)
+        return target.resolvingSymlinksInPath().path == canonical.resolvingSymlinksInPath().path
     }
 
     private static func shortHash(_ raw: String) -> String {

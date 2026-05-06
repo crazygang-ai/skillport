@@ -10,7 +10,7 @@
             <pubDate>{{PUBDATE}}</pubDate>
             <enclosure
                 url="{{DMG_URL}}"
-                sparkle:version="{{VERSION}}"
+                sparkle:version="{{BUILD_VERSION}}"
                 sparkle:shortVersionString="{{VERSION}}"
                 length="{{LENGTH}}"
                 type="application/octet-stream"

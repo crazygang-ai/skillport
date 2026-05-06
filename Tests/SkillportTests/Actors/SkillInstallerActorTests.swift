@@ -520,6 +520,35 @@ struct SkillInstallerMultiSkillTests {
         #expect(FileManager.default.fileExists(atPath: blockingUserDir.path))
     }
 
+    @Test("installGitHub failed reinstall keeps pre-existing agent links")
+    func installGitHubFailedReinstallKeepsExistingAgentLinks() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let bareRepo = try GitFixtures.makeBareRepoWithRootSKILL(under: dir.url)
+        let installer = makeInstaller(home: home)
+
+        _ = try await installer.installGitHub(
+            sourceURL: bareRepo, owner: "t", repo: "example", ref: "HEAD",
+            skillId: "example", home: home, installTo: [.claudeCode])
+
+        let existingLink = home.appendingPathComponent(".claude/skills/example")
+        let canonical = home.appendingPathComponent(".agents/skills/example")
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: existingLink.path) == canonical.path)
+
+        let blockingUserDir = home.appendingPathComponent(".kiro/skills/example")
+        try FileManager.default.createDirectory(at: blockingUserDir, withIntermediateDirectories: true)
+
+        await #expect(throws: SkillportError.self) {
+            _ = try await installer.installGitHub(
+                sourceURL: bareRepo, owner: "t", repo: "example", ref: "HEAD",
+                skillId: "example", home: home, installTo: [.claudeCode, .kiro])
+        }
+
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: existingLink.path) == canonical.path)
+        #expect(FileManager.default.fileExists(atPath: blockingUserDir.path))
+    }
+
     @Test("toggleAgent skips symlink when fallback chain already grants access")
     func toggleSkipsInheritedAgent() async throws {
         let dir = try TempDir.create()

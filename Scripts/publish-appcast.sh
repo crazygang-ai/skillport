@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./Scripts/publish-appcast.sh <export-dir> <version>
-# Example: ./Scripts/publish-appcast.sh build/export-0.1.0 0.1.0
+# Usage: ./Scripts/publish-appcast.sh <export-dir> <version> [build-version]
+# Example: ./Scripts/publish-appcast.sh build/export-0.1.0 0.1.0 202605061230
 #
 # Requires env vars:
 #   SPARKLE_PRIVATE_KEY_PATH  - path to EdDSA private key file
@@ -12,11 +12,19 @@ set -euo pipefail
 
 EXPORT_DIR="${1:?usage: publish-appcast.sh <export-dir> <version>}"
 VERSION="${2:?need version}"
+BUILD_VERSION="${3:-}"
 APP_PATH="$EXPORT_DIR/Skillport.app"
 
 if [ ! -d "$APP_PATH" ]; then
     echo "❌ $APP_PATH does not exist; run release.sh first"
     exit 1
+fi
+if [ -z "$BUILD_VERSION" ]; then
+    INFO_PLIST="$APP_PATH/Contents/Info.plist"
+    BUILD_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST" 2>/dev/null || true)"
+fi
+if [ -z "$BUILD_VERSION" ]; then
+    BUILD_VERSION="$VERSION"
 fi
 
 # 1. Package into .dmg
@@ -53,7 +61,7 @@ if [ ! -f "$KEY_PATH" ]; then
     exit 1
 fi
 echo "==> Signing $DMG_PATH with EdDSA..."
-SIGNATURE=$("$SIGN_TOOL" -f "$KEY_PATH" "$DMG_PATH")
+SIGNATURE=$("$SIGN_TOOL" -p -f "$KEY_PATH" "$DMG_PATH" | tr -d '\n')
 LENGTH=$(stat -f%z "$DMG_PATH")
 
 # 4. Generate appcast from template
@@ -71,6 +79,7 @@ DMG_URL="$BASE_URL/Skillport-$VERSION.dmg"
 APPCAST_FEED_URL="${APPCAST_URL:-$BASE_URL/appcast.xml}"
 
 /usr/bin/sed -i '' "s|{{VERSION}}|$VERSION|g" "$APPCAST_PATH"
+/usr/bin/sed -i '' "s|{{BUILD_VERSION}}|$BUILD_VERSION|g" "$APPCAST_PATH"
 /usr/bin/sed -i '' "s|{{PUBDATE}}|$(date -R)|g" "$APPCAST_PATH"
 /usr/bin/sed -i '' "s|{{LENGTH}}|$LENGTH|g" "$APPCAST_PATH"
 /usr/bin/sed -i '' "s|{{SIGNATURE}}|$SIGNATURE|g" "$APPCAST_PATH"
