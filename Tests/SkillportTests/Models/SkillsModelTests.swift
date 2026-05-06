@@ -125,7 +125,12 @@ struct SkillsModelTests {
     func isManagedSkill() async throws {
         let dir = try TempDir.create()
         defer { try? dir.cleanup() }
-        try AgentsFS.createCanonicalSkill(in: dir.url, name: "canonical")
+        let source = try dir.mkdir("owned")
+        try "---\n---\n".write(
+            to: source.appendingPathComponent("SKILL.md"),
+            atomically: true, encoding: .utf8
+        )
+        try AgentsFS.createCanonicalSkill(in: dir.url, name: "unowned")
         _ = try AgentsFS.createForeignSkill(
             in: dir.url,
             agentRelativeSkillsDir: ".claude/skills",
@@ -134,12 +139,15 @@ struct SkillsModelTests {
 
         let manager = makeManager(home: dir.url)
         let model = SkillsModel(manager: manager, home: dir.url)
+        _ = try await model.installLocal(from: source, installTo: [])
         try await model.refresh()
         let byName = Dictionary(uniqueKeysWithValues: model.skills.map { ($0.name, $0) })
 
-        let canonical = try #require(byName["canonical"])
+        let owned = try #require(byName["owned"])
+        let unowned = try #require(byName["unowned"])
         let external = try #require(byName["external"])
-        #expect(model.isManagedSkill(canonical) == true)
+        #expect(model.isManagedSkill(owned) == true)
+        #expect(model.isManagedSkill(unowned) == false)
         #expect(model.isManagedSkill(external) == false)
     }
 

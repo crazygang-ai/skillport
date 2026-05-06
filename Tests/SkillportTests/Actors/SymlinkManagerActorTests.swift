@@ -49,6 +49,23 @@ struct SymlinkManagerActorTests {
         #expect(resolved == t1.path)
     }
 
+    @Test("link classifies broken symlink before attempting to create")
+    func refusesExistingBrokenSymlink() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let target = try dir.mkdir("target")
+        let missing = dir.url.appendingPathComponent("missing")
+        let link = dir.url.appendingPathComponent("l")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: missing)
+
+        await #expect(throws: SkillportError.self) {
+            try await SymlinkManagerActor().link(target: target, at: link)
+        }
+
+        let resolved = try FileManager.default.destinationOfSymbolicLink(atPath: link.path)
+        #expect(resolved == missing.path)
+    }
+
     @Test("unlink removes only if it is a symlink pointing at expected target")
     func unlinkSafe() async throws {
         let dir = try TempDir.create()

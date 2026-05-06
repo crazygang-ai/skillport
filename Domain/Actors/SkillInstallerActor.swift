@@ -79,7 +79,8 @@ public actor SkillInstallerActor {
             source: skillSource,
             frontmatter: parsed.metadata,
             installedAgents: agents,
-            updateStatus: .unknown
+            updateStatus: .unknown,
+            isManagedBySkillport: true
         )
     }
 
@@ -204,13 +205,30 @@ public actor SkillInstallerActor {
             source: source,
             frontmatter: parsed.metadata,
             installedAgents: agents,
-            updateStatus: .upToDate
+            updateStatus: .upToDate,
+            isManagedBySkillport: true
         )
     }
 
     /// Remove Skillport-managed symlinks, delete canonical files, drop lockfile entry.
     public func uninstall(name: String, home: URL) async throws {
-        let canonical = home.appendingPathComponent(".agents/skills/\(name)")
+        let canonicalBase = home.appendingPathComponent(".agents/skills", isDirectory: true)
+        try Self.validateStorageName(name, canonicalBase: canonicalBase)
+
+        let lock = try await lockFile.read()
+        guard let locked = lock.skills.first(where: { $0.name == name }) else {
+            throw SkillportError.unexpected("Skill '\(name)' is not managed by Skillport.")
+        }
+
+        let canonical = locked.path
+        let canonicalPath = canonical.standardizedFileURL.path
+        let canonicalBasePath = canonicalBase.standardizedFileURL.path
+        guard canonicalPath == canonicalBasePath || canonicalPath.hasPrefix(canonicalBasePath + "/") else {
+            throw SkillportError.invalidLockFile(
+                reason: "managed skill '\(name)' points outside canonical skills directory"
+            )
+        }
+
         let stagedRemoval = try DirectoryReplacer.stageRemoveDirectory(at: canonical)
         do {
             try await lockFile.remove(name: name)

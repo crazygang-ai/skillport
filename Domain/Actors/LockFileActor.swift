@@ -52,7 +52,11 @@ public actor LockFileActor {
     public func remove(name: String) throws {
         try withFileLock {
             var lock = try readWithRecoveryNoticeUnlocked().lockFile
+            let originalCount = lock.skills.count
             lock.skills.removeAll { $0.name == name }
+            guard lock.skills.count != originalCount else {
+                throw SkillportError.unexpected("Skill '\(name)' is not managed by Skillport.")
+            }
             try writeUnlocked(lock)
         }
     }

@@ -60,12 +60,13 @@ public actor SkillManagerActor {
             )
             lock = LockFile(skills: [])
         }
-        var sourceByResolvedPath: [String: SkillSource] = [:]
+        var lockedByResolvedPath: [String: LockedSkill] = [:]
         for locked in lock.skills {
-            sourceByResolvedPath[locked.path.resolvingSymlinksInPath().path] = locked.source
+            lockedByResolvedPath[locked.path.resolvingSymlinksInPath().path] = locked
         }
         let merged: [Skill] = scanned.map { s in
-            let realSource = sourceByResolvedPath[s.path.resolvingSymlinksInPath().path] ?? s.source
+            let locked = lockedByResolvedPath[s.path.resolvingSymlinksInPath().path]
+            let realSource = locked?.source ?? s.source
             let id = SkillIdentity.compute(name: s.name, source: realSource)
             let updateStatus = updateStatuses[id] ?? s.updateStatus
             return Skill(
@@ -74,7 +75,8 @@ public actor SkillManagerActor {
                 source: realSource,
                 frontmatter: s.frontmatter,
                 installedAgents: s.installedAgents,
-                updateStatus: updateStatus
+                updateStatus: updateStatus,
+                isManagedBySkillport: locked?.name == s.name
             )
         }
         let currentIDs = Set(merged.map(\.id))

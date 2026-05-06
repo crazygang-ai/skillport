@@ -7,6 +7,7 @@ public struct Skill: Identifiable, Hashable, Sendable {
     public var frontmatter: SKILLMetadata
     public var installedAgents: Set<AgentID>
     public var updateStatus: UpdateStatus
+    public var isManagedBySkillport: Bool
 
     public var id: SkillIdentity {
         SkillIdentity.compute(name: name, source: source)
@@ -18,7 +19,8 @@ public struct Skill: Identifiable, Hashable, Sendable {
         source: SkillSource,
         frontmatter: SKILLMetadata,
         installedAgents: Set<AgentID>,
-        updateStatus: UpdateStatus
+        updateStatus: UpdateStatus,
+        isManagedBySkillport: Bool = false
     ) {
         self.name = name
         self.path = path
@@ -26,6 +28,7 @@ public struct Skill: Identifiable, Hashable, Sendable {
         self.frontmatter = frontmatter
         self.installedAgents = installedAgents
         self.updateStatus = updateStatus
+        self.isManagedBySkillport = isManagedBySkillport
     }
 
     public static func == (lhs: Skill, rhs: Skill) -> Bool {

@@ -156,10 +156,7 @@ public final class SkillsModel {
     }
 
     public func isManagedSkill(_ skill: Skill) -> Bool {
-        let canonicalBase = home.appendingPathComponent(".agents/skills", isDirectory: true)
-            .resolvingSymlinksInPath().path
-        let skillPath = skill.path.resolvingSymlinksInPath().path
-        return skillPath == canonicalBase || skillPath.hasPrefix(canonicalBase + "/")
+        skill.isManagedBySkillport
     }
 
     private func applyUpdateStatuses(_ statuses: [SkillIdentity: UpdateStatus]) {

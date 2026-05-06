@@ -64,6 +64,39 @@ struct SkillInstallerActorTests {
         #expect(lock.skills.isEmpty)
     }
 
+    @Test("uninstall refuses to delete canonical skill without lockfile ownership")
+    func uninstallRefusesUnownedCanonicalSkill() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let canonical = home.appendingPathComponent(".agents/skills/unowned", isDirectory: true)
+        try FileManager.default.createDirectory(at: canonical, withIntermediateDirectories: true)
+        try "---\n---\n".write(
+            to: canonical.appendingPathComponent("SKILL.md"),
+            atomically: true, encoding: .utf8
+        )
+        let linkDir = home.appendingPathComponent(".kiro/skills", isDirectory: true)
+        try FileManager.default.createDirectory(at: linkDir, withIntermediateDirectories: true)
+        let link = linkDir.appendingPathComponent("unowned")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: canonical)
+
+        let lockPath = home.appendingPathComponent(".agents/.skill-lock.json")
+        let installer = SkillInstallerActor(
+            git: GitActor(),
+            symlinker: SymlinkManagerActor(),
+            lockFile: LockFileActor(path: lockPath),
+            cache: CommitHashCache(path: home.appendingPathComponent(".agents/.skillport-cache.json"))
+        )
+
+        await #expect(throws: SkillportError.self) {
+            try await installer.uninstall(name: "unowned", home: home)
+        }
+
+        #expect(FileManager.default.fileExists(atPath: canonical.appendingPathComponent("SKILL.md").path))
+        let resolved = try FileManager.default.destinationOfSymbolicLink(atPath: link.path)
+        #expect(resolved == canonical.path)
+    }
+
     @Test("toggleAgent creates or removes symlink without touching lockfile entry")
     func toggleAgent() async throws {
         let dir = try TempDir.create()

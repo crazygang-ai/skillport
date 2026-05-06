@@ -165,6 +165,17 @@ struct LockFileActorTests {
         #expect(lock.skills.isEmpty)
     }
 
+    @Test("remove(name:) rejects missing skill entry")
+    func removeMissingEntry() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let actor = LockFileActor(path: dir.url.appendingPathComponent(".skill-lock.json"))
+
+        await #expect(throws: SkillportError.self) {
+            try await actor.remove(name: "missing")
+        }
+    }
+
     @Test("concurrent upserts from separate actors preserve both entries")
     func concurrentUpsertsPreserveEntries() async throws {
         let dir = try TempDir.create()

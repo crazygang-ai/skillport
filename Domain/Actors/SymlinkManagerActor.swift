@@ -9,22 +9,21 @@ public actor SymlinkManagerActor {
             at: linkURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        if fm.fileExists(atPath: linkURL.path) {
-            if let existing = try? fm.destinationOfSymbolicLink(atPath: linkURL.path) {
-                let existingURL =
-                    existing.hasPrefix("/")
-                    ? URL(fileURLWithPath: existing)
-                    : linkURL.deletingLastPathComponent().appendingPathComponent(existing)
-                if existingURL.resolvingSymlinksInPath().path == target.resolvingSymlinksInPath().path {
-                    return
-                }
-                throw SkillportError.fileIO(
-                    path: linkURL,
-                    reason: "path exists as a symlink to another target"
-                )
-            } else {
-                throw SkillportError.fileIO(path: linkURL, reason: "path exists and is not a symlink")
+        if let existing = try? fm.destinationOfSymbolicLink(atPath: linkURL.path) {
+            let existingURL =
+                existing.hasPrefix("/")
+                ? URL(fileURLWithPath: existing)
+                : linkURL.deletingLastPathComponent().appendingPathComponent(existing)
+            if existingURL.resolvingSymlinksInPath().path == target.resolvingSymlinksInPath().path {
+                return
             }
+            throw SkillportError.fileIO(
+                path: linkURL,
+                reason: "path exists as a symlink to another target"
+            )
+        }
+        if fm.fileExists(atPath: linkURL.path) {
+            throw SkillportError.fileIO(path: linkURL, reason: "path exists and is not a symlink")
         }
         try fm.createSymbolicLink(at: linkURL, withDestinationURL: target)
     }
