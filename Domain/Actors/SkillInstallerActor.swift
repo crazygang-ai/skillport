@@ -227,12 +227,22 @@ public actor SkillInstallerActor {
     }
 
     public func toggleAgent(name: String, agent: AgentID, install: Bool, home: URL) async throws {
+        let fm = FileManager.default
         let canonical = home.appendingPathComponent(".agents/skills/\(name)")
         guard let agentConfig = Agent.defaultAgents(home: home).first(where: { $0.id == agent }) else {
             return
         }
         let link = agentConfig.skillsDir.appendingPathComponent(name)
         if install {
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: canonical.path, isDirectory: &isDir), isDir.boolValue,
+                fm.fileExists(atPath: canonical.appendingPathComponent("SKILL.md").path)
+            else {
+                throw SkillportError.fileIO(
+                    path: canonical,
+                    reason: "canonical skill is missing or invalid"
+                )
+            }
             // 若 agent 的 fallback 已能读到同一 canonical，就不建冗余 symlink。
             if await symlinker.canInherit(
                 target: canonical, linkURL: link, fallbackChain: agentConfig.fallbackChain

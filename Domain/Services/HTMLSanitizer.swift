@@ -15,6 +15,19 @@ public struct HTMLSanitizer {
 
     public init() {}
 
+    public static func safeExternalURL(from value: String) -> URL? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.hasPrefix("//") else { return nil }
+        guard
+            let url = URL(string: trimmed),
+            let scheme = url.scheme?.lowercased(),
+            safeHrefProtocols.contains(scheme)
+        else {
+            return nil
+        }
+        return url
+    }
+
     public func sanitize(_ html: String) throws -> String {
         let doc: Document
         do {
@@ -77,14 +90,9 @@ public struct HTMLSanitizer {
         {
             return true
         }
-        guard let url = URL(string: trimmed),
-            let scheme = url.scheme?.lowercased()
-        else {
-            return false
-        }
         switch attr {
         case "href":
-            return safeHrefProtocols.contains(scheme)
+            return safeExternalURL(from: trimmed) != nil
         default:
             return false
         }

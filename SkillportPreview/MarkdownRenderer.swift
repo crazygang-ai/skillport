@@ -6,6 +6,8 @@ import Markdown
 /// 独立于主 app 的 RegistryContentRenderer（那是 @MainActor、返回 SwiftUI AttributedString）。
 /// 扩展沙盒下只能用 AppKit，这里直接吐 NSAttributedString 给 NSTextView。
 enum MarkdownRenderer {
+    private static let safeLinkSchemes: Set<String> = ["http", "https", "mailto", "tel"]
+
     static func renderToAttributed(_ markdown: String) -> NSAttributedString {
         let doc = Document(parsing: markdown)
         let out = NSMutableAttributedString()
@@ -102,7 +104,7 @@ enum MarkdownRenderer {
             out.append(s)
         case let link as Markdown.Link:
             let s = NSMutableAttributedString(string: link.plainText)
-            if let dest = link.destination, let url = URL(string: dest) {
+            if let dest = link.destination, let url = safeExternalURL(from: dest) {
                 s.addAttribute(
                     .link, value: url, range: NSRange(location: 0, length: s.length))
             }
@@ -135,5 +137,18 @@ enum MarkdownRenderer {
         default:
             out.append(NSAttributedString(string: node.format()))
         }
+    }
+
+    private static func safeExternalURL(from value: String) -> URL? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.hasPrefix("//") else { return nil }
+        guard
+            let url = URL(string: trimmed),
+            let scheme = url.scheme?.lowercased(),
+            safeLinkSchemes.contains(scheme)
+        else {
+            return nil
+        }
+        return url
     }
 }

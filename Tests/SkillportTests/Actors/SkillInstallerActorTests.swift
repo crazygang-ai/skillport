@@ -119,6 +119,26 @@ struct SkillInstallerActorTests {
         #expect(FileManager.default.fileExists(atPath: userDir.appendingPathComponent("note.txt").path))
     }
 
+    @Test("toggleAgent refuses to create a symlink when canonical skill is missing")
+    func toggleAgentRejectsMissingCanonical() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let installer = SkillInstallerActor(
+            git: GitActor(),
+            symlinker: SymlinkManagerActor(),
+            lockFile: LockFileActor(path: home.appendingPathComponent(".agents/.skill-lock.json")),
+            cache: CommitHashCache(path: home.appendingPathComponent(".agents/.skillport-cache.json"))
+        )
+
+        await #expect(throws: SkillportError.self) {
+            try await installer.toggleAgent(name: "ghost", agent: .kiro, install: true, home: home)
+        }
+
+        let link = home.appendingPathComponent(".kiro/skills/ghost")
+        #expect(!FileManager.default.fileExists(atPath: link.path))
+    }
+
     @Test("installLocal rolls back canonical copy and lockfile when agent install fails")
     func installLocalRollsBackOnAgentFailure() async throws {
         let dir = try TempDir.create()

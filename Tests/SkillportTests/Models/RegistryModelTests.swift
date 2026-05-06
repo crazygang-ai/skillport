@@ -100,6 +100,54 @@ struct RegistryModelTests {
         }
     }
 
+    @Test("select(id:) content failure does not become a list error")
+    func selectContentFailureDoesNotBreakList() async throws {
+        let model = makeModel()
+        model.skills = [
+            RegistrySkill(id: "owner/a/a", skillId: "a", name: "A", installs: 1, source: "owner/a"),
+            RegistrySkill(id: "owner/b/b", skillId: "b", name: "B", installs: 1, source: "owner/b"),
+        ]
+
+        await model.select(id: "owner/a/a")
+
+        #expect(model.skills.count == 2)
+        #expect(model.listError == nil)
+        #expect(model.contentError != nil)
+        switch model.rendered {
+        case .empty(let reason):
+            #expect(reason == "Failed to load")
+        default:
+            Issue.record("expected .empty failure state")
+        }
+    }
+
+    @Test("successful select clears previous content error")
+    func successfulSelectClearsContentError() async throws {
+        let model = makeModel()
+        model.skills = [
+            RegistrySkill(id: "owner/a/a", skillId: "a", name: "A", installs: 1, source: "owner/a"),
+            RegistrySkill(id: "owner/b/b", skillId: "b", name: "B", installs: 1, source: "owner/b"),
+        ]
+
+        await model.select(id: "owner/a/a")
+        #expect(model.contentError != nil)
+
+        MockURLProtocol.stub(
+            urlMatch: { $0.host == "raw.githubusercontent.com" },
+            status: 200,
+            body: Data("# recovered".utf8)
+        )
+        await model.select(id: "owner/b/b")
+
+        #expect(model.contentError == nil)
+        switch model.rendered {
+        case .markdown(let s):
+            #expect(String(s.characters).contains("recovered"))
+        default:
+            Issue.record("expected .markdown rendered result, got \(model.rendered)")
+        }
+    }
+
     @Test("runSearchNow hits /api/search and populates skills")
     func searchFiresNetwork() async throws {
         let model = makeModel()

@@ -172,7 +172,7 @@ private func renderInline(_ node: Markup) -> AttributedString {
 
     case let link as Markdown.Link:
         var s = inlineAttributed(link.children)
-        if let dest = link.destination, let url = URL(string: dest) {
+        if let dest = link.destination, let url = HTMLSanitizer.safeExternalURL(from: dest) {
             s.link = url
             s.foregroundColor = .accentColor
         }

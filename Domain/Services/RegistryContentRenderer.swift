@@ -158,7 +158,7 @@ public struct RegistryContentRenderer {
             return s
         case let link as Markdown.Link:
             var s = AttributedString(link.plainText)
-            if let dest = link.destination, let url = URL(string: dest) {
+            if let dest = link.destination, let url = HTMLSanitizer.safeExternalURL(from: dest) {
                 s.link = url
             }
             return s

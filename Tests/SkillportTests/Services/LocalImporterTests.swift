@@ -77,4 +77,25 @@ struct LocalImporterTests {
         let canonical = home.appendingPathComponent(".agents/skills/symlinked")
         #expect(!FileManager.default.fileExists(atPath: canonical.path))
     }
+
+    @Test("Refuses dot-prefixed skill folders because scanner skips hidden canonical entries")
+    func refusesHiddenSkillFolder() throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+
+        let src = try dir.mkdir(".hidden-skill")
+        try "---\n---\n".write(
+            to: src.appendingPathComponent("SKILL.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        let home = try dir.mkdir("home")
+
+        #expect(throws: SkillportError.self) {
+            _ = try LocalImporter().importSkill(from: src, home: home)
+        }
+
+        let canonical = home.appendingPathComponent(".agents/skills/.hidden-skill")
+        #expect(!FileManager.default.fileExists(atPath: canonical.path))
+    }
 }

@@ -28,7 +28,8 @@ public final class RegistryModel {
     public var rendered: RegistryRendered = .empty(reason: "Select a skill")
     public var isLoading: Bool = false
     public var isContentLoading: Bool = false
-    public var lastError: String?
+    public var listError: String?
+    public var contentError: String?
     public var selectedAgentsForInstall: Set<AgentID> = []
 
     private let registry: RegistryActor
@@ -60,7 +61,7 @@ public final class RegistryModel {
         let token = beginListRequest()
         let requestedCategory = category
         isLoading = true
-        lastError = nil
+        listError = nil
         defer { finishListRequest(token) }
         do {
             let result = try await registry.leaderboard(requestedCategory)
@@ -75,7 +76,7 @@ public final class RegistryModel {
                 category == requestedCategory,
                 trimmedSearchInput.isEmpty
             else { return }
-            lastError = String(describing: error)
+            listError = String(describing: error)
             skills = []
             totalCount = 0
         }
@@ -89,7 +90,7 @@ public final class RegistryModel {
         }
         let token = beginListRequest()
         isLoading = true
-        lastError = nil
+        listError = nil
         defer { finishListRequest(token) }
         do {
             let results = try await registry.search(query: q)
@@ -98,7 +99,7 @@ public final class RegistryModel {
             totalCount = results.count
         } catch {
             guard isCurrentListRequest(token), trimmedSearchInput == q else { return }
-            lastError = String(describing: error)
+            listError = String(describing: error)
             skills = []
         }
     }
@@ -108,6 +109,7 @@ public final class RegistryModel {
         selectionToken = token
         selectedID = id
         rendered = .empty(reason: "Loading…")
+        contentError = nil
         selectedAgentsForInstall = []
         guard let skill = skills.first(where: { $0.id == id }) else {
             isContentLoading = false
@@ -127,7 +129,7 @@ public final class RegistryModel {
             rendered = next
         } catch {
             guard isCurrentSelection(id: id, token: token) else { return }
-            lastError = String(describing: error)
+            contentError = String(describing: error)
             rendered = .empty(reason: "Failed to load")
         }
     }

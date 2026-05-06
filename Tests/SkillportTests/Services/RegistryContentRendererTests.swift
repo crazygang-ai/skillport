@@ -119,4 +119,22 @@ struct RegistryContentRendererTests {
             Issue.record("expected .markdown")
         }
     }
+
+    @Test("markdown links keep only safe external URL schemes")
+    func markdownLinkSchemeAllowlist() throws {
+        let md = """
+            [web](https://example.com) [mail](mailto:a@example.com) \
+            [file](file:///etc/passwd) [prefs](x-apple.systempreferences:com.apple.Security-Privacy)
+            """
+        switch try renderer.render(md) {
+        case .markdown(let str):
+            let links = str.runs.compactMap { $0.link?.absoluteString }
+            #expect(links.contains("https://example.com"))
+            #expect(links.contains("mailto:a@example.com"))
+            #expect(!links.contains("file:///etc/passwd"))
+            #expect(!links.contains("x-apple.systempreferences:com.apple.Security-Privacy"))
+        default:
+            Issue.record("expected .markdown")
+        }
+    }
 }

@@ -17,7 +17,11 @@ public struct LocalImporter: Sendable {
         }
         let canonicalBase = home.appendingPathComponent(".agents/skills", isDirectory: true)
         try fm.createDirectory(at: canonicalBase, withIntermediateDirectories: true)
-        let dest = canonicalBase.appendingPathComponent(source.lastPathComponent, isDirectory: true)
+        let name = source.lastPathComponent
+        guard !name.hasPrefix(".") else {
+            throw SkillportError.fileIO(path: source, reason: "skill folder name must not start with '.'")
+        }
+        let dest = canonicalBase.appendingPathComponent(name, isDirectory: true)
         if fm.fileExists(atPath: dest.path) {
             throw SkillportError.fileIO(path: dest, reason: "destination already exists")
         }

@@ -49,14 +49,14 @@ struct RegistrySidebar: View {
             if model.isLoading {
                 ProgressView().padding()
                 Spacer()
-            } else if let lastError = model.lastError {
+            } else if let listError = model.listError {
                 VStack(alignment: .leading, spacing: 8) {
                     Label(
                         String(localized: "Unable to load skills"),
                         systemImage: "exclamationmark.triangle"
                     )
                     .font(.callout)
-                    Text(lastError)
+                    Text(listError)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
