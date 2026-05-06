@@ -70,6 +70,57 @@ struct SkillsModelTests {
         #expect(model.agents.first?.id == .codex)
     }
 
+    @Test("refresh also updates agent availability when config dirs change")
+    func refreshUpdatesAgentAvailability() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let bin = try dir.mkdir("empty-bin")
+        let manager = makeManager(home: home)
+        let model = SkillsModel(
+            manager: manager,
+            home: home,
+            detector: AgentDetector(pathOverride: bin.path)
+        )
+
+        try await model.refresh()
+        #expect(model.agents.first { $0.id == .codex }?.isInstalled == false)
+
+        try FileManager.default.createDirectory(
+            at: home.appendingPathComponent(".codex"),
+            withIntermediateDirectories: true
+        )
+
+        try await model.refresh()
+        #expect(model.agents.first { $0.id == .codex }?.isInstalled == true)
+    }
+
+    @Test("skillsReloaded events refresh agent availability after external rescans")
+    func skillsReloadedEventRefreshesAgentAvailability() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let bin = try dir.mkdir("empty-bin")
+        let manager = makeManager(home: home)
+        let model = SkillsModel(
+            manager: manager,
+            home: home,
+            detector: AgentDetector(pathOverride: bin.path)
+        )
+
+        await model.refreshAgents()
+        #expect(model.agents.first { $0.id == .codex }?.isInstalled == false)
+
+        try FileManager.default.createDirectory(
+            at: home.appendingPathComponent(".codex"),
+            withIntermediateDirectories: true
+        )
+        _ = try await manager.rescan(home: home)
+        try await Task.sleep(for: .milliseconds(300))
+
+        #expect(model.agents.first { $0.id == .codex }?.isInstalled == true)
+    }
+
     @Test("isManagedSkill distinguishes canonical and external agent skills")
     func isManagedSkill() async throws {
         let dir = try TempDir.create()
@@ -143,6 +194,28 @@ struct SkillsModelTests {
         #expect(skill.updateStatus == .upToDate)
         let lock = try await lockFile.read()
         #expect(lock.skills.first { $0.name == "alpha" }?.dismissedUpdate == "remote-alpha")
+    }
+
+    @Test("uninstall removes the skill from the model without a separate refresh")
+    func uninstallRefreshesModel() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let src = try dir.mkdir("delete-me")
+        try "---\n---\n".write(
+            to: src.appendingPathComponent("SKILL.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let manager = makeManager(home: dir.url)
+        let model = SkillsModel(manager: manager, home: dir.url)
+        _ = try await model.installLocal(from: src, installTo: [])
+        try await model.refresh()
+        #expect(model.skills.contains { $0.name == "delete-me" })
+
+        try await model.uninstall(name: "delete-me")
+
+        #expect(!model.skills.contains { $0.name == "delete-me" })
     }
 
     private func makeManager(

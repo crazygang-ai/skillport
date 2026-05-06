@@ -65,8 +65,10 @@ fi
 APPCAST_PATH="$EXPORT_DIR/appcast.xml"
 cp "$TEMPLATE" "$APPCAST_PATH"
 
-DMG_URL="${APPCAST_DMG_BASE_URL:?set APPCAST_DMG_BASE_URL}/Skillport-$VERSION.dmg"
-APPCAST_FEED_URL="${APPCAST_URL:-$DMG_URL/../appcast.xml}"
+BASE_URL="${APPCAST_DMG_BASE_URL:?set APPCAST_DMG_BASE_URL}"
+BASE_URL="${BASE_URL%/}"
+DMG_URL="$BASE_URL/Skillport-$VERSION.dmg"
+APPCAST_FEED_URL="${APPCAST_URL:-$BASE_URL/appcast.xml}"
 
 /usr/bin/sed -i '' "s|{{VERSION}}|$VERSION|g" "$APPCAST_PATH"
 /usr/bin/sed -i '' "s|{{PUBDATE}}|$(date -R)|g" "$APPCAST_PATH"

@@ -125,6 +125,7 @@ public actor SkillInstallerActor {
             canonicalBase: canonicalBase,
             lock: oldLock
         )
+        try Self.validateStorageName(storageName, canonicalBase: canonicalBase)
         let dest = canonicalBase.appendingPathComponent(storageName, isDirectory: true)
         let suffix = UUID().uuidString
         let tmp = canonicalBase.appendingPathComponent(".\(storageName).tmp-\(suffix)", isDirectory: true)
@@ -358,6 +359,25 @@ public actor SkillInstallerActor {
             counter += 1
         }
         return candidate
+    }
+
+    private static func validateStorageName(_ name: String, canonicalBase: URL) throws {
+        let invalidReason: String?
+        if name.isEmpty {
+            invalidReason = "skill folder name must not be empty"
+        } else if name == "." || name == ".." || name.contains("/") {
+            invalidReason = "skill folder name must be a single path component"
+        } else if name.hasPrefix(".") {
+            invalidReason = "skill folder name must not start with '.'"
+        } else {
+            invalidReason = nil
+        }
+        if let invalidReason {
+            throw SkillportError.fileIO(
+                path: canonicalBase.appendingPathComponent(name, isDirectory: true),
+                reason: invalidReason
+            )
+        }
     }
 
     private static func normalizedSkillPath(_ path: String?) -> String {

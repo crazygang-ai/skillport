@@ -6,6 +6,7 @@ struct DashboardView: View {
     @Environment(SkillsModel.self) private var skillsModel
     @Environment(NotificationModel.self) private var notifications
     @State private var isDropTargeted = false
+    @State private var pendingUninstall: Skill?
 
     var body: some View {
         let list = skillsModel.skillsFiltered(by: app.currentAgentFilter)
@@ -37,6 +38,9 @@ struct DashboardView: View {
                             }
                         },
                         onOpen: { app.openEditor(for: skill.id) },
+                        onUninstall: {
+                            pendingUninstall = skill
+                        },
                         onApplyUpdate: {
                             Task { await applyUpdate(skill) }
                         },
@@ -61,6 +65,22 @@ struct DashboardView: View {
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             Task { [providers] in await handleDrop(providers: providers) }
             return true
+        }
+        .confirmationDialog(
+            String(localized: "Delete Skill"),
+            isPresented: uninstallDialogBinding,
+            presenting: pendingUninstall
+        ) { skill in
+            Button(String(localized: "Delete"), role: .destructive) {
+                Task { await uninstall(skill) }
+            }
+            Button(String(localized: "Cancel"), role: .cancel) {}
+        } message: { skill in
+            Text(
+                String(
+                    localized:
+                        "Delete \(skill.name) everywhere from Skillport? This removes the shared skill, all direct links, and update metadata."
+                ))
         }
     }
 
@@ -132,6 +152,31 @@ struct DashboardView: View {
                     level: .error,
                     message: String(localized: "Dismiss failed: \(error.localizedDescription)")))
         }
+    }
+
+    private func uninstall(_ skill: Skill) async {
+        do {
+            try await skillsModel.uninstall(name: skill.name)
+            pendingUninstall = nil
+            notifications.post(
+                .init(level: .success, message: String(localized: "Deleted \(skill.name)")))
+        } catch {
+            notifications.post(
+                .init(
+                    level: .error,
+                    message: String(localized: "Delete failed: \(error.localizedDescription)")))
+        }
+    }
+
+    private var uninstallDialogBinding: Binding<Bool> {
+        Binding(
+            get: { pendingUninstall != nil },
+            set: { isPresented in
+                if !isPresented {
+                    pendingUninstall = nil
+                }
+            }
+        )
     }
 
     private func loadFileURL(from provider: NSItemProvider) async throws -> URL {

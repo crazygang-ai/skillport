@@ -432,6 +432,30 @@ struct SkillInstallerMultiSkillTests {
         #expect(!FileManager.default.fileExists(atPath: canonical.path))
     }
 
+    @Test("installGitHub rejects hidden storage names because scanner skips them")
+    func installGitHubRejectsHiddenStorageName() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let bareRepo = try GitFixtures.makeBareRepoWithRootSKILL(under: dir.url)
+        let installer = makeInstaller(home: home)
+
+        await #expect(throws: SkillportError.self) {
+            _ = try await installer.installGitHub(
+                sourceURL: bareRepo,
+                owner: "t",
+                repo: ".hidden",
+                ref: "HEAD",
+                skillId: ".hidden",
+                home: home,
+                installTo: []
+            )
+        }
+
+        let canonical = home.appendingPathComponent(".agents/skills/.hidden")
+        #expect(!FileManager.default.fileExists(atPath: canonical.path))
+    }
+
     @Test("installGitHub post-swap agent failure rolls back existing canonical skill")
     func installGitHubPostSwapFailureRollsBackCanonical() async throws {
         let dir = try TempDir.create()

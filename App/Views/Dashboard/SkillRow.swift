@@ -4,12 +4,14 @@ struct SkillRow: View {
     let skill: Skill
     let onToggle: (AgentID, Bool) -> Void
     let onOpen: () -> Void
+    let onUninstall: () -> Void
     let onApplyUpdate: () -> Void
     let onDismissUpdate: (String) -> Void
 
     @Environment(SkillsModel.self) private var skillsModel
 
     var body: some View {
+        let isManagedBySkillport = skillsModel.isManagedSkill(skill)
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
@@ -25,7 +27,7 @@ struct SkillRow: View {
                 Spacer()
                 UpdateActions(
                     skill: skill,
-                    isManagedBySkillport: skillsModel.isManagedSkill(skill),
+                    isManagedBySkillport: isManagedBySkillport,
                     onApplyUpdate: onApplyUpdate,
                     onDismissUpdate: onDismissUpdate
                 )
@@ -34,11 +36,18 @@ struct SkillRow: View {
                 }
                 .buttonStyle(.borderless)
                 .help("Edit SKILL.md")
+                if isManagedBySkillport {
+                    Button(role: .destructive, action: onUninstall) {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                    .help(String(localized: "Delete Skill"))
+                }
             }
             AgentsRow(
                 skill: skill,
                 agents: skillsModel.agents,
-                isManagedBySkillport: skillsModel.isManagedSkill(skill),
+                isManagedBySkillport: isManagedBySkillport,
                 onToggle: onToggle
             )
         }

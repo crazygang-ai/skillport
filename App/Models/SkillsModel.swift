@@ -15,6 +15,8 @@ public final class SkillsModel {
     private let home: URL
     private weak var notifications: NotificationModel?
     @ObservationIgnored private var subscription: Task<Void, Never>?
+    @ObservationIgnored private var agentRefreshTask: Task<Void, Never>?
+    @ObservationIgnored private var agentRefreshQueued = false
 
     public init(
         manager: SkillManagerActor,
@@ -32,6 +34,7 @@ public final class SkillsModel {
 
     deinit {
         subscription?.cancel()
+        agentRefreshTask?.cancel()
     }
 
     private func subscribe() {
@@ -42,6 +45,7 @@ public final class SkillsModel {
                 switch event {
                 case .skillsReloaded(let list):
                     self.skills = list
+                    self.scheduleAgentRefreshAfterReload()
                 case .skillUpdateStatusChanged(let id, let status):
                     self.applyUpdateStatus(id: id, status: status)
                 case .error(let err):
@@ -77,18 +81,25 @@ public final class SkillsModel {
         defer { isScanning = false }
         let list = try await manager.rescan(home: home)
         skills = list
+        await refreshAgents()
     }
 
     /// Re-probe which agent CLIs are on PATH without rescanning the filesystem.
     public func refreshAgents() async {
-        guard !isDetectingAgents else { return }
+        guard !isDetectingAgents else {
+            agentRefreshQueued = true
+            return
+        }
         isDetectingAgents = true
         defer {
             isDetectingAgents = false
             hasDetectedAgents = true
         }
-        guard let map = try? await detector.detectAllStatuses(home: home) else { return }
-        agents = Self.agents(home: home, statuses: map)
+        repeat {
+            agentRefreshQueued = false
+            guard let map = try? await detector.detectAllStatuses(home: home) else { continue }
+            agents = Self.agents(home: home, statuses: map)
+        } while agentRefreshQueued && !Task.isCancelled
     }
 
     public func startWatching() async {
@@ -112,6 +123,8 @@ public final class SkillsModel {
 
     public func uninstall(name: String) async throws {
         try await manager.uninstall(name: name, home: home)
+        let list = try await manager.rescan(home: home)
+        skills = list
     }
 
     @discardableResult
@@ -158,6 +171,16 @@ public final class SkillsModel {
     private func applyUpdateStatus(id: SkillIdentity, status: UpdateStatus) {
         guard let index = skills.firstIndex(where: { $0.id == id }) else { return }
         skills[index].updateStatus = status
+    }
+
+    private func scheduleAgentRefreshAfterReload() {
+        guard !isScanning else { return }
+        agentRefreshTask?.cancel()
+        agentRefreshTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled else { return }
+            await self?.refreshAgents()
+        }
     }
 
     private static func agents(home: URL, statuses: [AgentID: AgentStatus]) -> [Agent] {
