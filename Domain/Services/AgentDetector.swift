@@ -42,7 +42,7 @@ public struct AgentDetector: Sendable {
         let fm = FileManager.default
         var result: [AgentID: AgentStatus] = [:]
         for agent in Agent.defaultAgents(home: home) {
-            let onPath = binaryOnPath(agentID: agent.id, in: searchPath)
+            let onPath = agentBinaryAvailable(agentID: agent.id, in: searchPath, home: home)
             let configExists = agent.configDir.map { fm.fileExists(atPath: $0.path) } ?? false
             let skillsExists = fm.fileExists(atPath: agent.skillsDir.path)
             let skillCount = skillsExists ? countValidSkills(in: agent.skillsDir) : 0
@@ -63,7 +63,29 @@ public struct AgentDetector: Sendable {
     // MARK: - Internals
 
     private func binaryOnPath(agentID: AgentID, in searchPath: String) -> Bool {
-        let binaryName = agentID.binaryName
+        agentBinaryAvailable(agentID: agentID, in: searchPath, home: nil)
+    }
+
+    private func agentBinaryAvailable(agentID: AgentID, in searchPath: String, home: URL?) -> Bool {
+        if agentID == .copilot {
+            return copilotCLIAvailable(in: searchPath, home: home)
+        }
+        return executableNamed(agentID.binaryName, in: searchPath)
+    }
+
+    private func copilotCLIAvailable(in searchPath: String, home: URL?) -> Bool {
+        if executableNamed("copilot", in: searchPath) {
+            return true
+        }
+        guard let home else { return false }
+        let cachedCLI = home.appendingPathComponent(".local/share/gh/copilot")
+        var isDir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: cachedCLI.path, isDirectory: &isDir)
+            && !isDir.boolValue
+            && FileManager.default.isExecutableFile(atPath: cachedCLI.path)
+    }
+
+    private func executableNamed(_ binaryName: String, in searchPath: String) -> Bool {
         for dir in searchPath.split(separator: ":").map(String.init) {
             let candidate = dir + "/" + binaryName
             var isDir: ObjCBool = false

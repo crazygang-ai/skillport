@@ -43,6 +43,47 @@ struct AgentDetectorTests {
         #expect(map.count == AgentID.allCases.count)
     }
 
+    @Test("Copilot is not installed just because GitHub CLI is on PATH")
+    func copilotRequiresActualCopilotState() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let bin = try dir.mkdir("bin")
+        let gh = bin.appendingPathComponent("gh")
+        try "#!/bin/sh\nexit 0\n".write(to: gh, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: gh.path)
+
+        let detector = AgentDetector(pathOverride: bin.path)
+        let map = try await detector.detectAllStatuses(home: home)
+
+        #expect(map[.copilot]?.binaryOnPath == false)
+        #expect(map[.copilot]?.isInstalled == false)
+    }
+
+    @Test("Copilot is installed when the gh-managed Copilot CLI exists")
+    func copilotDetectsCachedCLI() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let cachedCLI = home.appendingPathComponent(".local/share/gh/copilot")
+        try FileManager.default.createDirectory(
+            at: cachedCLI.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try "#!/bin/sh\nexit 0\n".write(to: cachedCLI, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: cachedCLI.path
+        )
+        let emptyBin = try dir.mkdir("emptybin")
+
+        let detector = AgentDetector(pathOverride: emptyBin.path)
+        let map = try await detector.detectAllStatuses(home: home)
+
+        #expect(map[.copilot]?.binaryOnPath == true)
+        #expect(map[.copilot]?.isInstalled == true)
+    }
+
     @Test("detectAllStatuses marks agent installed when only configDir exists (no PATH binary)")
     func statusesConfigDirFallback() async throws {
         let dir = try TempDir.create()

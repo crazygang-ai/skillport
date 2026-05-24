@@ -21,8 +21,10 @@ struct RegistryRow: View {
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(isSelected ? Color.accentColor.opacity(0.15) : .clear)
         .cornerRadius(4)
+        .contentShape(Rectangle())
     }
 
     private func formatInstalls(_ n: Int) -> String {
