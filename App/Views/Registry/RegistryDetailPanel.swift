@@ -25,12 +25,11 @@ struct RegistryDetailPanel: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
-                VStack {
-                    Spacer()
-                    Text(strings("Select a skill to see details"))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
+                ContentUnavailableView(
+                    strings("Select a skill"),
+                    systemImage: "books.vertical",
+                    description: Text(strings("Choose a registry result to preview documentation and install it."))
+                )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -78,8 +77,7 @@ struct RegistryDetailPanel: View {
                 .truncationMode(.middle)
                 .padding(8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(4)
+                .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
                 .textSelection(.enabled)
                 .help(strings("Install command"))
             Button {
@@ -89,9 +87,11 @@ struct RegistryDetailPanel: View {
                 notifications.post(
                     .init(level: .success, message: strings("Copied install command")))
             } label: {
-                Image(systemName: "doc.on.doc")
+                Label(strings("Copy install command"), systemImage: "doc.on.doc")
+                    .labelStyle(.iconOnly)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(strings("Copy install command"))
             .help(strings("Copy install command"))
         }
         .padding(.horizontal)
@@ -211,27 +211,28 @@ struct RegistryAgentChipsFlow: View {
                             .scaleEffect(isSelected ? 1 : 0.7)
                     }
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 5)
                     .background(
                         isSelected
-                            ? Color.accentColor.opacity(0.3)
-                            : Color.clear
+                            ? Color.accentColor.opacity(0.18)
+                            : Color.secondary.opacity(0.08),
+                        in: Capsule()
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 4)
+                        Capsule()
                             .stroke(
                                 isSelected
                                     ? Color.accentColor.opacity(0.55)
-                                    : Color.gray.opacity(0.4),
+                                    : Color.secondary.opacity(0.18),
                                 lineWidth: 1
                             )
                     )
-                    .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
                 .disabled(isDisabled || !agent.isInstalled)
                 .opacity(agent.isInstalled ? (isDisabled ? 0.7 : 1) : 0.48)
                 .help(helpText(for: agent))
+                .accessibilityLabel(accessibilityLabel(for: agent))
                 .animation(
                     reduceMotion ? nil : .snappy(duration: 0.16),
                     value: selected.contains(agent.id)
@@ -251,5 +252,10 @@ struct RegistryAgentChipsFlow: View {
             return strings("Remove \(agent.id.displayName) from install targets")
         }
         return strings("Install to \(agent.id.displayName)")
+    }
+
+    private func accessibilityLabel(for agent: Agent) -> String {
+        let state = selected.contains(agent.id) ? strings("Selected") : strings("Not selected")
+        return "\(agent.id.displayName), \(state)"
     }
 }

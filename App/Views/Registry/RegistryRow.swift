@@ -2,31 +2,36 @@ import SwiftUI
 
 struct RegistryRow: View {
     let skill: RegistrySkill
-    let isSelected: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.appStrings) private var strings
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(skill.name).font(.body).lineLimit(1)
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 8) {
+                Text(skill.name)
+                    .font(.callout.weight(.medium))
+                    .lineLimit(1)
                 Spacer()
-                Label(formatInstalls(skill.installs), systemImage: "arrow.down.circle")
-                    .labelStyle(.titleAndIcon)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 3) {
+                    Image(systemName: "arrow.down.circle")
+                    Text(formatInstalls(skill.installs))
+                        .monospacedDigit()
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
             Text(skill.source)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .truncationMode(.middle)
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(isSelected ? Color.accentColor.opacity(0.15) : .clear)
-        .cornerRadius(4)
         .contentShape(Rectangle())
-        .animation(reduceMotion ? nil : .snappy(duration: 0.16), value: isSelected)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(skill.name), \(skill.source), \(strings("\(skill.installs) installs"))"
+        )
     }
 
     private func formatInstalls(_ n: Int) -> String {

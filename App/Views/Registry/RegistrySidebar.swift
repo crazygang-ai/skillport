@@ -7,44 +7,34 @@ struct RegistrySidebar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Search
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField(strings("Search skills"), text: $model.searchInput)
                     .textFieldStyle(.plain)
             }
             .padding(8)
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(6)
+            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
             .padding(8)
             .help(strings("Search registry skills"))
 
-            // Category tabs (hidden when searching)
             if model.searchInput.trimmingCharacters(in: .whitespaces).isEmpty {
-                HStack(spacing: 4) {
-                    ForEach(LeaderboardCategory.allCases, id: \.self) { c in
-                        Button {
-                            withMotion {
-                                model.category = c
-                            }
-                        } label: {
-                            Text(label(for: c))
-                                .font(.caption)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(
-                                    model.category == c
-                                        ? Color.accentColor.opacity(0.3) : .clear
-                                )
-                                .cornerRadius(4)
+                HStack(spacing: 8) {
+                    Picker(strings("Registry category"), selection: categoryBinding) {
+                        ForEach(LeaderboardCategory.allCases, id: \.self) { c in
+                            Text(label(for: c)).tag(c)
                         }
-                        .buttonStyle(.plain)
-                        .help(help(for: c))
                     }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .help(strings("Choose registry category"))
+
                     Spacer()
+
                     if model.totalCount > 0 {
                         Text("\(model.totalCount)")
                             .font(.caption2).foregroundStyle(.secondary)
+                            .monospacedDigit()
+                            .help(strings("\(model.totalCount) skills"))
                     }
                 }
                 .padding(.horizontal, 8)
@@ -52,7 +42,6 @@ struct RegistrySidebar: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            // List
             if model.isLoading {
                 ProgressView().padding()
                 Spacer()
@@ -75,32 +64,26 @@ struct RegistrySidebar: View {
                 .padding()
                 Spacer()
             } else if model.skills.isEmpty {
-                Text(
-                    model.searchInput.isEmpty
-                        ? strings("No skills available")
-                        : strings("No results")
+                ContentUnavailableView(
+                    model.searchInput.isEmpty ? strings("No skills available") : strings("No results"),
+                    systemImage: model.searchInput.isEmpty ? "books.vertical" : "magnifyingglass",
+                    description: Text(
+                        model.searchInput.isEmpty
+                            ? strings("Try another category or retry loading the registry.")
+                            : strings("Check spelling or search for a shorter skill name.")
+                    )
                 )
-                .font(.callout)
-                .foregroundStyle(.secondary)
                 .padding()
                 Spacer()
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 2) {
-                        ForEach(model.skills) { skill in
-                            Button {
-                                withMotion {
-                                    _ = model.beginSelect(id: skill.id)
-                                }
-                            } label: {
-                                RegistryRow(skill: skill, isSelected: model.selectedID == skill.id)
-                            }
-                            .buttonStyle(.plain)
+                List(selection: selectionBinding) {
+                    ForEach(model.skills) { skill in
+                        RegistryRow(skill: skill)
+                            .tag(skill.id)
                             .help(strings("Show skill details"))
-                        }
                     }
-                    .padding(.horizontal, 4)
                 }
+                .listStyle(.sidebar)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -110,6 +93,29 @@ struct RegistrySidebar: View {
         .animation(
             microAnimation,
             value: model.searchInput.trimmingCharacters(in: .whitespaces).isEmpty
+        )
+    }
+
+    private var selectionBinding: Binding<String?> {
+        Binding(
+            get: { model.selectedID },
+            set: { newID in
+                guard let newID, newID != model.selectedID else { return }
+                withMotion {
+                    _ = model.beginSelect(id: newID)
+                }
+            }
+        )
+    }
+
+    private var categoryBinding: Binding<LeaderboardCategory> {
+        Binding(
+            get: { model.category },
+            set: { newCategory in
+                withMotion {
+                    model.category = newCategory
+                }
+            }
         )
     }
 
@@ -126,14 +132,6 @@ struct RegistrySidebar: View {
         case .allTime: return strings("All Time")
         case .trending: return strings("Trending")
         case .hot: return strings("Hot")
-        }
-    }
-
-    private func help(for c: LeaderboardCategory) -> String {
-        switch c {
-        case .allTime: return strings("Show all-time leaderboard")
-        case .trending: return strings("Show trending skills")
-        case .hot: return strings("Show hot skills")
         }
     }
 

@@ -35,25 +35,33 @@ struct SkillRow: View {
                     onDismissUpdate: onDismissUpdate
                 )
                 Button(action: onCopyPath) {
-                    Image(systemName: "doc.on.doc")
+                    Label(strings("Copy skill path"), systemImage: "doc.on.doc")
+                        .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
+                .accessibilityLabel(strings("Copy skill path"))
                 .help(strings("Copy skill path"))
                 Button(action: onRevealInFinder) {
-                    Image(systemName: "folder")
+                    Label(strings("Reveal in Finder"), systemImage: "folder")
+                        .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
+                .accessibilityLabel(strings("Reveal in Finder"))
                 .help(strings("Reveal in Finder"))
                 Button(action: onOpen) {
-                    Image(systemName: "pencil")
+                    Label(strings("Edit SKILL.md"), systemImage: "pencil")
+                        .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
+                .accessibilityLabel(strings("Edit SKILL.md"))
                 .help(strings("Edit SKILL.md"))
                 if isManagedBySkillport {
                     Button(role: .destructive, action: onUninstall) {
-                        Image(systemName: "trash")
+                        Label(strings("Delete Skill"), systemImage: "trash")
+                            .labelStyle(.iconOnly)
                     }
                     .buttonStyle(.borderless)
+                    .accessibilityLabel(strings("Delete Skill"))
                     .help(strings("Delete Skill"))
                 }
             }
@@ -87,9 +95,11 @@ private struct UpdateActions: View {
                 Button {
                     onDismissUpdate(remoteHash)
                 } label: {
-                    Image(systemName: "xmark.circle")
+                    Label(strings("Dismiss this update"), systemImage: "xmark.circle")
+                        .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
+                .accessibilityLabel(strings("Dismiss this update"))
                 .help(strings("Dismiss this update"))
             }
         }
