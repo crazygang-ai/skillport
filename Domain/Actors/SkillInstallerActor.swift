@@ -456,64 +456,151 @@ public actor SkillInstallerActor {
     /// 顶层复制，跳过 `excluding` 中的 entry 名（如 `.git`）。嵌套层级保持原样。
     public static func copyDirectory(from src: URL, to dest: URL, excluding excludes: Set<String>) throws {
         let fm = FileManager.default
-        if let symlink = try firstIncludedSymlink(in: src, excludingTopLevelNames: excludes) {
-            throw SkillportError.fileIO(
-                path: symlink,
-                reason: "remote skill refuses source trees containing symlinks"
-            )
-        }
+        let context = DirectoryCopyContext(
+            allowedRoot: symlinkAllowedRoot(for: src),
+            excludedTopLevelNames: excludes
+        )
         try fm.createDirectory(at: dest, withIntermediateDirectories: true)
-        let entries = try fm.contentsOfDirectory(at: src, includingPropertiesForKeys: nil, options: [])
+        let entries = try fm.contentsOfDirectory(
+            at: src,
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+            options: []
+        )
+        var visitedDirectories: Set<String> = []
         for entry in entries {
             if excludes.contains(entry.lastPathComponent) { continue }
             let target = dest.appendingPathComponent(entry.lastPathComponent)
-            try fm.copyItem(at: entry, to: target)
+            try copyIncludedItem(
+                from: entry, to: target, context: context, visitedDirectories: &visitedDirectories)
         }
     }
 
-    private static func firstIncludedSymlink(
-        in url: URL,
-        excludingTopLevelNames excludes: Set<String>
-    ) throws -> URL? {
-        let values = try url.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey])
+    private struct DirectoryCopyContext {
+        let allowedRoot: URL
+        let excludedTopLevelNames: Set<String>
+
+        var allowedRootPath: String {
+            allowedRoot.resolvingSymlinksInPath().path
+        }
+    }
+
+    private static func copyIncludedItem(
+        from source: URL,
+        to dest: URL,
+        context: DirectoryCopyContext,
+        visitedDirectories: inout Set<String>
+    ) throws {
+        let fm = FileManager.default
+        let values = try source.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey])
         if values.isSymbolicLink == true {
-            return url
+            let resolved = try resolvedRemoteSymlinkTarget(source, context: context)
+            try copyResolvedItem(
+                from: resolved, to: dest, context: context, visitedDirectories: &visitedDirectories)
+            return
         }
-        guard values.isDirectory == true else {
-            return nil
+        if values.isDirectory == true {
+            try copyDirectoryContents(
+                from: source, to: dest, context: context, visitedDirectories: &visitedDirectories)
+        } else {
+            try fm.copyItem(at: source, to: dest)
         }
+    }
+
+    private static func copyResolvedItem(
+        from source: URL,
+        to dest: URL,
+        context: DirectoryCopyContext,
+        visitedDirectories: inout Set<String>
+    ) throws {
+        let fm = FileManager.default
+        var isDirectory: ObjCBool = false
+        guard fm.fileExists(atPath: source.path, isDirectory: &isDirectory) else {
+            throw SkillportError.fileIO(path: source, reason: "remote skill symlink target does not exist")
+        }
+        if isDirectory.boolValue {
+            try copyDirectoryContents(
+                from: source, to: dest, context: context, visitedDirectories: &visitedDirectories)
+        } else {
+            try fm.copyItem(at: source, to: dest)
+        }
+    }
+
+    private static func copyDirectoryContents(
+        from source: URL,
+        to dest: URL,
+        context: DirectoryCopyContext,
+        visitedDirectories: inout Set<String>
+    ) throws {
+        let fm = FileManager.default
+        let resolvedPath = source.resolvingSymlinksInPath().path
+        if visitedDirectories.contains(resolvedPath) {
+            throw SkillportError.fileIO(path: source, reason: "remote skill symlink cycle detected")
+        }
+        visitedDirectories.insert(resolvedPath)
+        defer { visitedDirectories.remove(resolvedPath) }
+
+        try fm.createDirectory(at: dest, withIntermediateDirectories: true)
         let entries = try FileManager.default.contentsOfDirectory(
-            at: url,
+            at: source,
             includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
             options: []
         )
         for entry in entries {
-            if excludes.contains(entry.lastPathComponent) { continue }
-            if let symlink = try firstSymlink(in: entry) {
-                return symlink
+            if resolvedPath == context.allowedRootPath,
+                context.excludedTopLevelNames.contains(entry.lastPathComponent)
+            {
+                continue
             }
+            let target = dest.appendingPathComponent(entry.lastPathComponent)
+            try copyIncludedItem(
+                from: entry, to: target, context: context, visitedDirectories: &visitedDirectories)
         }
-        return nil
     }
 
-    private static func firstSymlink(in url: URL) throws -> URL? {
-        let values = try url.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey])
-        if values.isSymbolicLink == true {
-            return url
+    private static func resolvedRemoteSymlinkTarget(
+        _ symlink: URL,
+        context: DirectoryCopyContext
+    ) throws -> URL {
+        let fm = FileManager.default
+        let rawTarget = try fm.destinationOfSymbolicLink(atPath: symlink.path)
+        let target =
+            rawTarget.hasPrefix("/")
+            ? URL(fileURLWithPath: rawTarget)
+            : symlink.deletingLastPathComponent().appendingPathComponent(rawTarget)
+        let resolved = target.resolvingSymlinksInPath().standardizedFileURL
+        let resolvedPath = resolved.path
+        let allowedRootPath = context.allowedRootPath
+        guard resolvedPath == allowedRootPath || resolvedPath.hasPrefix(allowedRootPath + "/") else {
+            throw SkillportError.fileIO(
+                path: symlink,
+                reason: "remote skill symlink target escapes cloned repo"
+            )
         }
-        guard values.isDirectory == true else {
-            return nil
+
+        let relative = normalizedSkillPath(relativePath(of: resolved, relativeTo: context.allowedRoot))
+        if let firstComponent = relative.split(separator: "/").first,
+            context.excludedTopLevelNames.contains(String(firstComponent))
+        {
+            throw SkillportError.fileIO(
+                path: symlink,
+                reason: "remote skill symlink target points at excluded path '\(firstComponent)'"
+            )
         }
-        let entries = try FileManager.default.contentsOfDirectory(
-            at: url,
-            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
-            options: []
-        )
-        for entry in entries {
-            if let symlink = try firstSymlink(in: entry) {
-                return symlink
+        return resolved
+    }
+
+    private static func symlinkAllowedRoot(for src: URL) -> URL {
+        let fm = FileManager.default
+        var current = src.standardizedFileURL
+        while true {
+            if fm.fileExists(atPath: current.appendingPathComponent(".git").path) {
+                return current.resolvingSymlinksInPath().standardizedFileURL
             }
+            let parent = current.deletingLastPathComponent()
+            if parent.path == current.path {
+                return src.resolvingSymlinksInPath().standardizedFileURL
+            }
+            current = parent
         }
-        return nil
     }
 }

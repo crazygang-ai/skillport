@@ -22,15 +22,60 @@ enum GitFixtures {
         return bareURL
     }
 
-    /// 造一个 bare repo，根目录的 SKILL.md 是 symlink。
-    static func makeBareRepoWithRootSKILLSymlink(under home: URL) throws -> URL {
+    /// 造一个 bare repo，其中 `.claude/skills/<skill>/` 内的 assets 通过 symlink 指向 repo 内的 `src/`。
+    static func makeBareRepoWithClaudeSkillSymlinkedAssets(under home: URL) throws -> URL {
         let workDir = home.appendingPathComponent("repo-work-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
-        try "---\ndescription: symlink\n---\n# Root\n".write(
-            to: workDir.appendingPathComponent("real.md"), atomically: true, encoding: .utf8)
+
+        let skillDir = workDir.appendingPathComponent(".claude/skills/ui-ux-pro-max")
+        try FileManager.default.createDirectory(at: skillDir, withIntermediateDirectories: true)
+        try "---\ndescription: ui ux\n---\n# UI UX\n".write(
+            to: skillDir.appendingPathComponent("SKILL.md"), atomically: true, encoding: .utf8)
+
+        let sourceScripts = workDir.appendingPathComponent("src/ui-ux-pro-max/scripts")
+        try FileManager.default.createDirectory(at: sourceScripts, withIntermediateDirectories: true)
+        try "#!/bin/sh\necho ok\n".write(
+            to: sourceScripts.appendingPathComponent("run.sh"), atomically: true, encoding: .utf8)
+
+        let sourceData = workDir.appendingPathComponent("src/ui-ux-pro-max/data")
+        try FileManager.default.createDirectory(at: sourceData, withIntermediateDirectories: true)
+        try "{\"ok\":true}\n".write(
+            to: sourceData.appendingPathComponent("config.json"), atomically: true, encoding: .utf8)
+
         try FileManager.default.createSymbolicLink(
-            atPath: workDir.appendingPathComponent("SKILL.md").path,
-            withDestinationPath: "real.md"
+            atPath: skillDir.appendingPathComponent("scripts").path,
+            withDestinationPath: "../../../src/ui-ux-pro-max/scripts"
+        )
+        try FileManager.default.createSymbolicLink(
+            atPath: skillDir.appendingPathComponent("data").path,
+            withDestinationPath: "../../../src/ui-ux-pro-max/data"
+        )
+
+        try runGit(in: workDir, ["init", "-b", "main"])
+        try runGit(in: workDir, ["add", "."])
+        try runGit(
+            in: workDir,
+            [
+                "-c", "user.name=t", "-c", "user.email=t@t.t",
+                "commit", "-m", "init",
+            ])
+        let bareURL = home.appendingPathComponent("bare-\(UUID().uuidString).git")
+        try runGit(in: workDir, ["clone", "--bare", ".", bareURL.path])
+        return bareURL
+    }
+
+    /// 造一个 bare repo，其中 skill 内的 symlink 指向 repo 外。
+    static func makeBareRepoWithEscapingSymlink(under home: URL) throws -> URL {
+        let outside = home.appendingPathComponent("outside-target")
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+
+        let workDir = home.appendingPathComponent("repo-work-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: workDir, withIntermediateDirectories: true)
+        try "---\ndescription: escaping\n---\n# Root\n".write(
+            to: workDir.appendingPathComponent("SKILL.md"), atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(
+            atPath: workDir.appendingPathComponent("scripts").path,
+            withDestinationPath: outside.path
         )
         try runGit(in: workDir, ["init", "-b", "main"])
         try runGit(in: workDir, ["add", "."])

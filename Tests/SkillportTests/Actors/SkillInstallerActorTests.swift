@@ -447,12 +447,34 @@ struct SkillInstallerMultiSkillTests {
         #expect(try skillBody(at: canonical) == "old")
     }
 
-    @Test("installGitHub rejects remote source trees containing symlinks")
-    func installGitHubRejectsSymlinkTree() async throws {
+    @Test("installGitHub dereferences repo-internal symlinked skill assets")
+    func installGitHubDereferencesRepoInternalSymlinkedSkillAssets() async throws {
         let dir = try TempDir.create()
         defer { try? dir.cleanup() }
         let home = try dir.mkdir("home")
-        let bareRepo = try GitFixtures.makeBareRepoWithRootSKILLSymlink(under: dir.url)
+        let bareRepo = try GitFixtures.makeBareRepoWithClaudeSkillSymlinkedAssets(under: dir.url)
+        let installer = makeInstaller(home: home)
+
+        let skill = try await installer.installGitHub(
+            sourceURL: bareRepo, owner: "nextlevelbuilder", repo: "ui-ux-pro-max-skill", ref: "HEAD",
+            skillId: "ui-ux-pro-max", home: home, installTo: [])
+
+        #expect(skill.name == "ui-ux-pro-max")
+        let canonical = home.appendingPathComponent(".agents/skills/ui-ux-pro-max")
+        let scripts = canonical.appendingPathComponent("scripts")
+        let data = canonical.appendingPathComponent("data")
+        #expect(FileManager.default.fileExists(atPath: scripts.appendingPathComponent("run.sh").path))
+        #expect(FileManager.default.fileExists(atPath: data.appendingPathComponent("config.json").path))
+        #expect((try scripts.resourceValues(forKeys: [.isSymbolicLinkKey])).isSymbolicLink == false)
+        #expect((try data.resourceValues(forKeys: [.isSymbolicLinkKey])).isSymbolicLink == false)
+    }
+
+    @Test("installGitHub rejects remote symlinks that resolve outside the cloned repo")
+    func installGitHubRejectsEscapingSymlinkTree() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let home = try dir.mkdir("home")
+        let bareRepo = try GitFixtures.makeBareRepoWithEscapingSymlink(under: dir.url)
         let installer = makeInstaller(home: home)
 
         await #expect(throws: SkillportError.self) {
