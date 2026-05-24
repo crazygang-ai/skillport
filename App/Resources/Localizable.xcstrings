@@ -993,6 +993,9 @@
         }
       }
     },
+    "localhost, 127.0.0.1, *.local" : {
+
+    },
     "Network" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1166,6 +1169,9 @@
           }
         }
       }
+    },
+    "owner/repo" : {
+
     },
     "Password (stored in Keychain)" : {
       "extractionState" : "stale",
@@ -1577,6 +1583,9 @@
 
     },
     "SOCKS5" : {
+
+    },
+    "subskill" : {
 
     },
     "Toggle failed: %@" : {

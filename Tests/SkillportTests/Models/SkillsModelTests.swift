@@ -176,6 +176,42 @@ struct SkillsModelTests {
         #expect(model.isManagedSkill(external) == false)
     }
 
+    @Test("skillsFiltered supports search query and ownership filter")
+    func skillsFilteredWithSearchAndOwnership() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let source = try dir.mkdir("owned")
+        try "---\ndescription: Managed Alpha\n---\n# Body\n".write(
+            to: source.appendingPathComponent("SKILL.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        _ = try AgentsFS.createForeignSkill(
+            in: dir.url,
+            agentRelativeSkillsDir: ".claude/skills",
+            name: "external-beta"
+        )
+
+        let manager = makeManager(home: dir.url)
+        let model = SkillsModel(manager: manager, home: dir.url)
+        _ = try await model.installLocal(from: source, installTo: [])
+        try await model.refresh()
+
+        let managed = model.skillsFiltered(
+            by: nil,
+            query: "alpha",
+            ownership: .managed
+        )
+        #expect(managed.map(\.name) == ["owned"])
+
+        let external = model.skillsFiltered(
+            by: nil,
+            query: "beta",
+            ownership: .external
+        )
+        #expect(external.map(\.name) == ["external-beta"])
+    }
+
     @Test("checkAllUpdates writes update statuses back into model skills")
     func checkAllUpdatesWritesStatuses() async throws {
         let dir = try TempDir.create()

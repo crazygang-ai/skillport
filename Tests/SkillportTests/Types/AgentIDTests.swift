@@ -29,7 +29,7 @@ struct AgentIDTests {
     func binaryNames() {
         #expect(AgentID.claudeCode.binaryName == "claude")
         #expect(AgentID.codex.binaryName == "codex")
-        #expect(AgentID.copilot.binaryName == "copilot")
+        #expect(AgentID.copilot.binaryName == "gh")
     }
 
     @Test("Codable round-trip")

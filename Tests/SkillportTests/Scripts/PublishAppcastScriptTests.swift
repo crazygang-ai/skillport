@@ -36,6 +36,7 @@ struct PublishAppcastScriptTests {
             .deletingLastPathComponent()  // Scripts
             .deletingLastPathComponent()  // SkillportTests
             .deletingLastPathComponent()  // Tests
+            .deletingLastPathComponent()  // repo root
             .appendingPathComponent("Scripts/publish-appcast.sh")
     }
 
@@ -64,6 +65,7 @@ struct ReleaseScriptTests {
             .deletingLastPathComponent()  // Scripts
             .deletingLastPathComponent()  // SkillportTests
             .deletingLastPathComponent()  // Tests
+            .deletingLastPathComponent()  // repo root
             .appendingPathComponent("Scripts/release.sh")
     }
 }

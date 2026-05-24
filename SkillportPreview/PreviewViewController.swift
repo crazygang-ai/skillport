@@ -30,7 +30,10 @@ class PreviewViewController: NSViewController, @preconcurrency QLPreviewingContr
     func preparePreviewOfFile(at url: URL, completionHandler handler: @escaping (Error?) -> Void) {
         do {
             let raw = try String(contentsOf: url, encoding: .utf8)
-            let parsed = try? SKILLMdParser.parse(raw)
+            let parsed =
+                url.lastPathComponent.caseInsensitiveCompare("SKILL.md") == .orderedSame
+                ? try? SKILLMdParser.parse(raw)
+                : nil
             let body = parsed?.body ?? raw
 
             let attr = NSMutableAttributedString()

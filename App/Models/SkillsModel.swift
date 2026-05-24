@@ -1,6 +1,12 @@
 import Foundation
 import Observation
 
+public enum SkillOwnershipFilter: String, CaseIterable, Hashable, Sendable {
+    case all
+    case managed
+    case external
+}
+
 @MainActor
 @Observable
 public final class SkillsModel {
@@ -139,6 +145,23 @@ public final class SkillsModel {
         return try await manager.installLocal(from: source, home: home, installTo: installTo)
     }
 
+    public func installGitHub(
+        reference: GitHubRepoReference,
+        skillId: String?,
+        installTo: Set<AgentID>
+    ) async throws -> Skill {
+        let normalizedSkillId = skillId?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return try await manager.installGitHub(
+            owner: reference.owner,
+            repo: reference.repo,
+            ref: "HEAD",
+            skillId: normalizedSkillId?.isEmpty == true ? nil : normalizedSkillId,
+            home: home,
+            installTo: installTo
+        )
+    }
+
     public func uninstall(name: String) async throws {
         let list = try await manager.uninstall(name: name, home: home)
         skills = list
@@ -165,8 +188,32 @@ public final class SkillsModel {
     }
 
     public func skillsFiltered(by agent: AgentID?) -> [Skill] {
-        guard let agent else { return skills }
-        return skills.filter { $0.installedAgents.contains(agent) }
+        skillsFiltered(by: agent, query: "", ownership: .all)
+    }
+
+    public func skillsFiltered(
+        by agent: AgentID?,
+        query: String,
+        ownership: SkillOwnershipFilter
+    ) -> [Skill] {
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return skills.filter { skill in
+            if let agent, !skill.installedAgents.contains(agent) {
+                return false
+            }
+            switch ownership {
+            case .all:
+                break
+            case .managed:
+                guard skill.isManagedBySkillport else { return false }
+            case .external:
+                guard !skill.isManagedBySkillport else { return false }
+            }
+            guard !trimmedQuery.isEmpty else { return true }
+            return skill.name.localizedCaseInsensitiveContains(trimmedQuery)
+                || (skill.frontmatter.description?.localizedCaseInsensitiveContains(trimmedQuery)
+                    ?? false)
+        }
     }
 
     public func skillCount(for agent: AgentID) -> Int {

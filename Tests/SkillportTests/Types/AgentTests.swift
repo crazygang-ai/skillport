@@ -55,6 +55,16 @@ struct AgentTests {
             ])
     }
 
+    @Test("Agent detection metadata matches SkillPilot parity")
+    func detectionMetadataParity() {
+        let home = URL(fileURLWithPath: "/tmp/testhome")
+        let agents = Agent.defaultAgents(home: home)
+        let byID = Dictionary(uniqueKeysWithValues: agents.map { ($0.id, $0) })
+
+        #expect(AgentID.copilot.binaryName == "gh")
+        #expect(byID[.antigravity]?.configDir == home.appendingPathComponent(".gemini"))
+    }
+
     @Test("assignmentStatus distinguishes direct, inherited, and not assigned")
     func assignmentStatus() throws {
         let dir = try TempDir.create()

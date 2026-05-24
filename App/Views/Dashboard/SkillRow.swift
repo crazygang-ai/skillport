@@ -5,6 +5,8 @@ struct SkillRow: View {
     let onToggle: (AgentID, Bool) -> Void
     let onOpen: () -> Void
     let onUninstall: () -> Void
+    let onCopyPath: () -> Void
+    let onRevealInFinder: () -> Void
     let onApplyUpdate: () -> Void
     let onDismissUpdate: (String) -> Void
 
@@ -31,11 +33,21 @@ struct SkillRow: View {
                     onApplyUpdate: onApplyUpdate,
                     onDismissUpdate: onDismissUpdate
                 )
+                Button(action: onCopyPath) {
+                    Image(systemName: "doc.on.doc")
+                }
+                .buttonStyle(.borderless)
+                .help(String(localized: "Copy skill path"))
+                Button(action: onRevealInFinder) {
+                    Image(systemName: "folder")
+                }
+                .buttonStyle(.borderless)
+                .help(String(localized: "Reveal in Finder"))
                 Button(action: onOpen) {
                     Image(systemName: "pencil")
                 }
                 .buttonStyle(.borderless)
-                .help("Edit SKILL.md")
+                .help(String(localized: "Edit SKILL.md"))
                 if isManagedBySkillport {
                     Button(role: .destructive, action: onUninstall) {
                         Image(systemName: "trash")

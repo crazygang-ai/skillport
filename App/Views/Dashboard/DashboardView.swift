@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -7,14 +8,24 @@ struct DashboardView: View {
     @Environment(NotificationModel.self) private var notifications
     @State private var isDropTargeted = false
     @State private var pendingUninstall: Skill?
+    @State private var searchText = ""
+    @State private var ownershipFilter: SkillOwnershipFilter = .all
+    @State private var showingGitHubImport = false
 
     var body: some View {
-        let list = skillsModel.skillsFiltered(by: app.currentAgentFilter)
-        VStack {
+        let list = skillsModel.skillsFiltered(
+            by: app.currentAgentFilter,
+            query: searchText,
+            ownership: ownershipFilter
+        )
+        VStack(spacing: 0) {
+            dashboardControls
             if skillsModel.isScanning && skillsModel.skills.isEmpty {
                 ProgressView(String(localized: "Scanning…"))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if list.isEmpty {
                 emptyState
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(list) { skill in
                     SkillRow(
@@ -41,6 +52,12 @@ struct DashboardView: View {
                         onUninstall: {
                             pendingUninstall = skill
                         },
+                        onCopyPath: {
+                            copyPath(skill)
+                        },
+                        onRevealInFinder: {
+                            NSWorkspace.shared.activateFileViewerSelecting([skill.path])
+                        },
                         onApplyUpdate: {
                             Task { await applyUpdate(skill) }
                         },
@@ -65,6 +82,39 @@ struct DashboardView: View {
         .navigationTitle(
             app.currentAgentFilter?.displayName ?? String(localized: "All Skills")
         )
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    showingGitHubImport = true
+                } label: {
+                    Label(String(localized: "Import from GitHub"), systemImage: "globe")
+                }
+                Button {
+                    importLocalSkill()
+                } label: {
+                    Label(String(localized: "Import Skill…"), systemImage: "folder.badge.plus")
+                }
+            }
+            ToolbarItemGroup(placement: .automatic) {
+                Button {
+                    Task {
+                        try? await skillsModel.refresh(forceAgentSearchPathRefresh: true)
+                    }
+                } label: {
+                    Label(String(localized: "Rescan"), systemImage: "arrow.clockwise")
+                }
+                Button {
+                    Task { await checkAllUpdates() }
+                } label: {
+                    Label(String(localized: "Check for Skill Updates"), systemImage: "arrow.down.circle")
+                }
+            }
+        }
+        .sheet(isPresented: $showingGitHubImport) {
+            GitHubImportSheet()
+                .environment(skillsModel)
+                .environment(notifications)
+        }
         .overlay {
             if isDropTargeted {
                 RoundedRectangle(cornerRadius: 12)
@@ -94,6 +144,26 @@ struct DashboardView: View {
         }
     }
 
+    private var dashboardControls: some View {
+        HStack(spacing: 12) {
+            TextField(String(localized: "Search installed skills"), text: $searchText)
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 320)
+
+            Picker(String(localized: "Ownership"), selection: $ownershipFilter) {
+                Text(String(localized: "All")).tag(SkillOwnershipFilter.all)
+                Text(String(localized: "Skillport")).tag(SkillOwnershipFilter.managed)
+                Text(String(localized: "External")).tag(SkillOwnershipFilter.external)
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 260)
+
+            Spacer()
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+    }
+
     @ViewBuilder
     private var emptyState: some View {
         if let agent = app.currentAgentFilter, !skillsModel.skills.isEmpty {
@@ -119,6 +189,24 @@ struct DashboardView: View {
         }
     }
 
+    private func importLocalSkill() {
+        guard let url = ImportCommand.pickFolder() else { return }
+        Task {
+            do {
+                _ = try await skillsModel.installLocal(from: url, installTo: [])
+                notifications.post(
+                    .init(
+                        level: .success,
+                        message: String(localized: "Imported \(url.lastPathComponent)")))
+            } catch {
+                notifications.post(
+                    .init(
+                        level: .error,
+                        message: String(localized: "Import failed: \(error.localizedDescription)")))
+            }
+        }
+    }
+
     private func handleDrop(providers: [NSItemProvider]) async {
         for provider in providers {
             guard let url = try? await loadFileURL(from: provider) else { continue }
@@ -135,6 +223,37 @@ struct DashboardView: View {
                         message: String(
                             localized: "Import failed: \(error.localizedDescription)")))
             }
+        }
+    }
+
+    private func copyPath(_ skill: Skill) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(skill.path.path, forType: .string)
+        notifications.post(
+            .init(level: .success, message: String(localized: "Copied skill path")))
+    }
+
+    private func checkAllUpdates() async {
+        do {
+            let results = try await skillsModel.checkAllUpdates()
+            let available = results.values.filter {
+                if case .available = $0 { return true }
+                return false
+            }.count
+            notifications.post(
+                .init(
+                    level: available > 0 ? .info : .success,
+                    message: available > 0
+                        ? String(localized: "\(available) skill updates available")
+                        : String(localized: "All skills are up to date")
+                ))
+        } catch {
+            notifications.post(
+                .init(
+                    level: .error,
+                    message: String(localized: "Update check failed: \(error.localizedDescription)")
+                ))
         }
     }
 

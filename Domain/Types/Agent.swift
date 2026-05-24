@@ -125,7 +125,7 @@ public struct Agent: Identifiable, Hashable, Sendable {
                 id: .antigravity,
                 skillsDir: dir(".gemini/antigravity/skills"),
                 fallbackChain: [],
-                configDir: dir(".gemini/antigravity")),
+                configDir: dir(".gemini")),
             Agent(
                 id: .cursor,
                 skillsDir: dir(".cursor/skills"),

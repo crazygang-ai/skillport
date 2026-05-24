@@ -5,6 +5,12 @@ struct NetworkTab: View {
     @Environment(NotificationModel.self) private var notifications
     @State private var password: String = ""
     @State private var loadedPassword: Bool = false
+    @State private var bypassListText: String = ""
+    @FocusState private var focusedField: FocusedField?
+
+    private enum FocusedField {
+        case bypassList
+    }
 
     var body: some View {
         Form {
@@ -27,10 +33,27 @@ struct NetworkTab: View {
                 Button(String(localized: "Save password")) {
                     Task { await savePassword() }
                 }
+                TextField(
+                    String(localized: "Bypass proxy for"),
+                    text: $bypassListText,
+                    prompt: Text("localhost, 127.0.0.1, *.local"),
+                    axis: .vertical
+                )
+                .lineLimit(2...4)
+                .focused($focusedField, equals: .bypassList)
+                .onChange(of: bypassListText) { _, newValue in
+                    applyBypassList(newValue)
+                }
             }
         }
         .formStyle(.grouped)
         .padding()
+        .onAppear {
+            syncBypassListText(force: true)
+        }
+        .onChange(of: settings.proxy) {
+            syncBypassListText(force: false)
+        }
         .task {
             if !loadedPassword {
                 loadedPassword = true
@@ -53,6 +76,23 @@ struct NetworkTab: View {
                 .init(
                     level: .error,
                     message: String(localized: "Failed to save password: \(error.localizedDescription)")))
+        }
+    }
+
+    private func applyBypassList(_ raw: String) {
+        let entries = ProxyBypassListFormatter.parse(raw)
+        let nextList: [String]? = entries.isEmpty ? nil : entries
+        guard settings.proxy.bypassList != nextList else { return }
+        var p = settings.proxy
+        p.bypassList = nextList
+        Task { await settings.apply(proxy: p) }
+    }
+
+    private func syncBypassListText(force: Bool) {
+        guard force || focusedField != .bypassList else { return }
+        let rendered = ProxyBypassListFormatter.string(from: settings.proxy.bypassList)
+        if bypassListText != rendered {
+            bypassListText = rendered
         }
     }
 
