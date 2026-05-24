@@ -58,6 +58,16 @@ struct ReleaseScriptTests {
         #expect(!script.contains("test | xcpretty ||"))
     }
 
+    @Test("release script packages a GitHub Release DMG without notarization")
+    func releaseScriptPackagesDMGOnly() throws {
+        let script = try String(contentsOf: scriptURL(), encoding: .utf8)
+
+        #expect(script.contains("Scripts/package-dmg.sh"))
+        #expect(!script.contains("Scripts/notarize.sh"))
+        #expect(!script.contains("Scripts/publish-appcast.sh"))
+        #expect(!script.contains("prepare-export-options.sh"))
+    }
+
     private func scriptURL() -> URL {
         let thisFile = URL(fileURLWithPath: #filePath)
         return
@@ -70,6 +80,36 @@ struct ReleaseScriptTests {
     }
 }
 
+@Suite("package-dmg.sh")
+struct PackageDMGScriptTests {
+    @Test("package script creates a compressed DMG from an app bundle")
+    func createsCompressedDMG() throws {
+        let script = try String(contentsOf: scriptURL(), encoding: .utf8)
+
+        #expect(script.contains("hdiutil create"))
+        #expect(script.contains("-format UDZO"))
+        #expect(script.contains("Skillport-$VERSION.dmg"))
+    }
+
+    @Test("package script includes Applications shortcut for install UX")
+    func includesApplicationsShortcut() throws {
+        let script = try String(contentsOf: scriptURL(), encoding: .utf8)
+
+        #expect(script.contains("ln -s /Applications"))
+    }
+
+    private func scriptURL() -> URL {
+        let thisFile = URL(fileURLWithPath: #filePath)
+        return
+            thisFile
+            .deletingLastPathComponent()  // Scripts
+            .deletingLastPathComponent()  // SkillportTests
+            .deletingLastPathComponent()  // Tests
+            .deletingLastPathComponent()  // repo root
+            .appendingPathComponent("Scripts/package-dmg.sh")
+    }
+}
+
 @Suite("release.yml")
 struct ReleaseWorkflowTests {
     @Test("release workflow can publish release assets")
@@ -79,33 +119,39 @@ struct ReleaseWorkflowTests {
         #expect(workflow.contains("\npermissions:\n  contents: write\n"))
     }
 
-    @Test("release workflow runs full preflight before archive")
-    func runsPreflightBeforeArchive() throws {
+    @Test("release workflow runs full preflight before release build")
+    func runsPreflightBeforeReleaseBuild() throws {
         let workflow = try String(contentsOf: workflowURL(), encoding: .utf8)
 
         let lint = try #require(workflow.range(of: "swift-format lint --recursive"))
         let test = try #require(
             workflow.range(of: "xcodebuild \\\n            -scheme Skillport"))
-        let archive = try #require(workflow.range(of: "- name: Archive"))
+        let build = try #require(workflow.range(of: "- name: Build release app"))
 
-        #expect(lint.lowerBound < archive.lowerBound)
-        #expect(test.lowerBound < archive.lowerBound)
+        #expect(lint.lowerBound < build.lowerBound)
+        #expect(test.lowerBound < build.lowerBound)
     }
 
-    @Test("release workflow derives appcast URLs from the release tag")
-    func derivesAppcastURLsFromTag() throws {
+    @Test("release workflow does not require Apple signing or Sparkle secrets")
+    func doesNotRequireSigningOrSparkleSecrets() throws {
         let workflow = try String(contentsOf: workflowURL(), encoding: .utf8)
-        let expectedDMGBaseURL =
-            "APPCAST_DMG_BASE_URL: "
-            + "https://github.com/crazygang-ai/skillport/releases/download/"
-            + "${{ github.ref_name }}"
-        let expectedAppcastURL =
-            "APPCAST_URL: "
-            + "https://github.com/crazygang-ai/skillport/releases/latest/download/appcast.xml"
 
-        #expect(!workflow.contains("secrets.APPCAST_DMG_BASE_URL"))
-        #expect(workflow.contains(expectedDMGBaseURL))
-        #expect(workflow.contains(expectedAppcastURL))
+        #expect(!workflow.contains("DEV_ID_CERT_BASE64"))
+        #expect(!workflow.contains("DEVELOPMENT_TEAM"))
+        #expect(!workflow.contains("AC_APP_SPECIFIC_PASSWORD"))
+        #expect(!workflow.contains("SPARKLE_PRIVATE_KEY_BASE64"))
+        #expect(!workflow.contains("notarize.sh"))
+        #expect(!workflow.contains("publish-appcast.sh"))
+        #expect(!workflow.contains("appcast.xml"))
+    }
+
+    @Test("release workflow uploads only GitHub Release DMG")
+    func uploadsOnlyGitHubReleaseDMG() throws {
+        let workflow = try String(contentsOf: workflowURL(), encoding: .utf8)
+
+        #expect(workflow.contains("./Scripts/package-dmg.sh build/export/Skillport.app"))
+        #expect(workflow.contains("build/export/Skillport-*.dmg"))
+        #expect(!workflow.contains("build/export/appcast.xml"))
     }
 
     private func workflowURL() -> URL {

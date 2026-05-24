@@ -1,162 +1,106 @@
 # Skillport Release Setup
 
-本文档列出首次发布 Skillport 前需要你（repo owner）做的一次性动作。完成 6 个步骤后即可跑 `./Scripts/release.sh X.Y.Z` 进入正式发布流程。
+当前默认发布路径是：GitHub Actions 构建 ad-hoc signed `.app`，打包 `.dmg`，上传到 GitHub Release。这个路径不需要 Apple Developer ID、不做 notarization、不生成 Sparkle appcast。
+
+这足够用于早期下载试用。代价是 macOS 首次打开时会提示 app 来自未识别开发者，用户需要在 System Settings -> Privacy & Security 里手动允许打开。
 
 ---
 
-## 1. Apple Developer ID 证书
+## 1. 默认发布：GitHub Release DMG
 
-1. 在 https://developer.apple.com 开通 / 续费 Apple Developer Program（$99/年）
-2. 在 Keychain Access.app 里生成 CSR（Certificate Signing Request），在开发者后台换两张证书：
-   - **Developer ID Application** — 用于签 `.app`
-   - **Developer ID Installer** — （可选，`.pkg` 会用到）
-3. 把两张证书导入本机 Login Keychain，双击安装即可
-4. 记下 **Team ID**（10 字符，如 `ABCDE12345`）。填到 `project.yml` 的 settings：
+本仓库的 `.github/workflows/release.yml` 在推送 `v*` tag 时自动执行：
 
-```yaml
-settings:
-  base:
-    DEVELOPMENT_TEAM: "ABCDE12345"
-```
+1. `./Scripts/bootstrap.sh`
+2. `./Scripts/generate-project.sh`
+3. `./Scripts/check-parser-parity.sh`
+4. `swift-format lint --recursive App Domain Tests SkillportPreview`
+5. `xcodebuild test`
+6. `xcodebuild build` with ad-hoc signing
+7. `./Scripts/package-dmg.sh`
+8. upload `Skillport-X.Y.Z.dmg` to GitHub Release
 
-下次跑 `./Scripts/generate-project.sh` 会把 team ID 落到 Xcode project。
+默认路径不需要任何 GitHub Actions secrets。
 
 ---
 
-## 2. Notarize credential
+## 2. 本地准备 release
 
-1. 在 https://appleid.apple.com → Security → App-Specific Passwords 生成一个 "skillport-notarize"，记下这个 password
-2. 本机存到 Keychain 便于 release.sh 反复用：
+确认 working tree clean 后：
 
 ```bash
-xcrun notarytool store-credentials "skillport-notarize" \
-    --apple-id you@example.com \
-    --team-id ABCDE12345 \
-    --password YOUR_APP_SPECIFIC_PASSWORD
-```
-
-3. 本地发布时：
-
-```bash
-export AC_PROFILE=skillport-notarize
-./Scripts/notarize.sh build/export-0.1.0/Skillport.app
-```
-
-4. CI（GitHub Actions）不走 `AC_PROFILE`，需要 3 个 secret：`AC_USERNAME` / `AC_TEAM_ID` / `AC_APP_SPECIFIC_PASSWORD`（见步骤 5）
-
----
-
-## 3. Sparkle EdDSA key pair
-
-一次性生成，保管好 private key — 丢了所有旧 appcast signature 都作废。
-
-```bash
-# Sparkle 通过 SPM 引入后, 它的 artifact 会有 sign_update 工具
-# 在 Xcode build 完一次之后, 工具通常在:
-#   ~/Library/Developer/Xcode/DerivedData/Skillport-*/SourcePackages/artifacts/Sparkle/bin/
-
-# 生成密钥对:
-generate_keys  # 或者写全路径
-# 输出: sparkle_eddsa_priv.key 和 sparkle_eddsa_pub.key
-```
-
-- **Private key** (`sparkle_eddsa_priv.key`): 保管好。`.gitignore` 已经屏蔽 `sparkle_eddsa_private_key` 和 `*.ed25519`，但仍然不要放项目目录
-- **Public key**（base64 string）：填到 `App/Resources/Info.plist` 的 `SUPublicEDKey` 替换掉占位符 `YOUR_PUBLIC_ED25519_KEY_BASE64`
-- CI secret: `SPARKLE_PRIVATE_KEY_BASE64` = private key 文件内容的 base64，例如：
-
-```bash
-base64 < sparkle_eddsa_priv.key | pbcopy
-# 粘贴到 GitHub secret
-```
-
----
-
-## 4. Appcast 托管
-
-选一条路：
-
-### 4a. GitHub Release assets（默认）
-
-1. DMG 和 `appcast.xml` 都由 `.github/workflows/release.yml` 上传到 tag 对应的 GitHub Release
-2. `appcast.xml` 的 feed URL 使用 latest release asset：
-   `https://github.com/crazygang-ai/skillport/releases/latest/download/appcast.xml`
-3. DMG 下载 URL 由 CI 根据 tag 自动生成：
-   `https://github.com/crazygang-ai/skillport/releases/download/vX.Y.Z/Skillport-X.Y.Z.dmg`
-4. 把 `App/Resources/Info.plist` 的 `SUFeedURL` 改为：
-   `https://github.com/crazygang-ai/skillport/releases/latest/download/appcast.xml`
-
-### 4b. 自有域名 / CDN
-
-1. 域名如 `updates.crazygang.ai`，DNS 指到 S3 / Cloudflare Pages / 自家 nginx
-2. `SUFeedURL` = `https://updates.crazygang.ai/appcast.xml`
-3. 调整 `.github/workflows/release.yml` 的 `APPCAST_DMG_BASE_URL` / `APPCAST_URL`
-4. 每次 release 后把 appcast.xml + DMG 一起上传到该域名
-
----
-
-## 5. GitHub Secrets（CI 用）
-
-在 repo 的 Settings → Secrets and variables → Actions 加这 7 个：
-
-| Secret | 值 | 备注 |
-|---|---|---|
-| `DEVELOPMENT_TEAM` | Apple Team ID (10 字符) | 同步 `project.yml` |
-| `DEV_ID_CERT_BASE64` | Developer ID Application `.p12` 的 base64 | `base64 < cert.p12` |
-| `DEV_ID_CERT_PASSWORD` | `.p12` 导出时设的密码 | |
-| `AC_USERNAME` | 你的 Apple ID | |
-| `AC_TEAM_ID` | Apple Team ID | 同 `DEVELOPMENT_TEAM` |
-| `AC_APP_SPECIFIC_PASSWORD` | App-Specific Password | 步骤 2 的那个 |
-| `SPARKLE_PRIVATE_KEY_BASE64` | EdDSA private key 文件的 base64 | 步骤 3 生成 |
-
----
-
-## 6. 第一次 release（端到端）
-
-```bash
-# 0. 确保 Info.plist 的 SUFeedURL 和 SUPublicEDKey 已替换成真实值
-grep -E "YOUR_DOMAIN|YOUR_PUBLIC" App/Resources/Info.plist
-# 如果有输出, 说明还没配好 — 改完再跑下面
-
-# 1. 本地 build + archive + export
 ./Scripts/release.sh 0.1.0
+```
 
-# 2. Notarize (AC_PROFILE 已经 store 过)
-export AC_PROFILE=skillport-notarize
-./Scripts/notarize.sh build/export-0.1.0/Skillport.app
+这个脚本会：
 
-# 3. Package + sign + appcast
-export SPARKLE_PRIVATE_KEY_PATH=$HOME/.ssh/sparkle_eddsa_priv.key  # 或实际路径
-export APPCAST_DMG_BASE_URL=https://github.com/crazygang-ai/skillport/releases/download/v0.1.0
-export APPCAST_URL=https://github.com/crazygang-ai/skillport/releases/latest/download/appcast.xml
-./Scripts/publish-appcast.sh build/export-0.1.0 0.1.0
+1. bump `project.yml` / generated Xcode project version
+2. run parity / lint / tests
+3. build Release `.app` with ad-hoc signing
+4. package `build/export-0.1.0/Skillport-0.1.0.dmg`
+5. commit version bump
+6. create tag `v0.1.0`
 
-# 4. Push tag → CI release workflow 会重跑一次并上传 GH Release assets
+然后 push：
+
+```bash
 git push && git push --tags
 ```
 
-CI release workflow 读 secrets 把一切做一遍 — 首次建议本地做完验证 artifact，再推 tag 让 CI 重做（结果一致即 green light）。
+CI 会在 GitHub Release 里上传同版本 DMG。
 
 ---
 
-## 后续 releases
+## 3. 只让 CI 发布
+
+如果不想本地打 DMG，也可以手动更新版本、commit，然后打 tag：
 
 ```bash
-# 确认 working tree clean 后
-./Scripts/release.sh 0.1.1
-./Scripts/notarize.sh build/export-0.1.1/Skillport.app
-./Scripts/publish-appcast.sh build/export-0.1.1 0.1.1
-git push && git push --tags
-# 或者只推 tag, 让 CI 全自动
+git tag v0.1.0
+git push origin main
+git push origin v0.1.0
 ```
+
+更推荐用 `./Scripts/release.sh X.Y.Z`，因为它会先跑本地校验并保持 app 内版本和 tag 一致。
+
+---
+
+## 4. 用户安装说明
+
+下载 GitHub Release 里的 `Skillport-X.Y.Z.dmg` 后：
+
+1. 打开 DMG
+2. 把 `Skillport.app` 拖到 `Applications`
+3. 首次打开如果被 macOS 拦截，进入 System Settings -> Privacy & Security，点击允许打开
+
+这是未 notarized build 的预期行为。
+
+---
+
+## 5. 后续补齐正式分发能力
+
+公开分发给普通用户前，再补：
+
+1. Apple Developer Program
+2. Developer ID Application certificate
+3. notarization credential
+4. Sparkle EdDSA key pair
+5. `SUFeedURL` / `SUPublicEDKey`
+6. appcast generation and signing
+
+相关脚本仍保留：
+
+- `Scripts/notarize.sh`
+- `Scripts/publish-appcast.sh`
+- `Scripts/prepare-export-options.sh`
+
+后续恢复完整 signed/notarized/Sparkle 发布链路时，再把这些脚本接回 `release.yml`。
 
 ---
 
 ## 常见问题
 
-**"signing identity not found"** — 检查 Keychain 里证书是否 imported，cert 是否过期（`security find-identity -v -p codesigning`）。
+**macOS 提示 app 来自未识别开发者** - 当前 DMG 是 ad-hoc signed 且未 notarized，这是预期行为。进入 System Settings -> Privacy & Security 手动允许打开。
 
-**notarize 失败 "invalid credentials"** — 确认 `AC_PROFILE` 对应的 credential 还有效（Apple 会每 180 天过期 App-Specific Password，重新生成即可）。
+**GitHub Actions 没有上传 DMG** - 检查 repo Actions permission。`release.yml` 已显式声明 `permissions: contents: write`，正常情况下可以上传 release asset。
 
-**Sparkle "signature mismatch"** — private key 和 Info.plist 的 public key 不配对。重新跑 `generate_keys` 或找回原私钥。
-
-**GitHub Actions release workflow 跑失败但本地成功** — 多半是 secret 没配齐。Workflow 里所有 secret 读取都有清晰 error message。
+**想取消首次打开警告** - 需要 Apple Developer ID + notarization。仅改 DMG 打包方式不能消除 Gatekeeper 警告。

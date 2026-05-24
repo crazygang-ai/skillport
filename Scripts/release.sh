@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Usage: ./Scripts/release.sh <version>
 # Example: ./Scripts/release.sh 0.1.0
-# Requires: Developer ID 证书装在 Keychain (见 docs/RELEASE-SETUP.md)。
+# Produces an ad-hoc signed DMG for GitHub Release download.
 
 if [ -z "${1:-}" ]; then
     echo "Usage: $0 <version>"
@@ -18,9 +18,17 @@ cd "$REPO_ROOT"
 
 echo "==> Releasing Skillport v$VERSION build $BUILD"
 
-# 1. 检查 clean working tree
+PROJECT_VERSION_COMMITTED=false
+restore_project_version() {
+    if [ "$PROJECT_VERSION_COMMITTED" = false ]; then
+        git checkout -- project.yml Skillport.xcodeproj/project.pbxproj >/dev/null 2>&1 || true
+    fi
+}
+trap restore_project_version ERR
+
+# 1. Check clean working tree
 if ! git diff-index --quiet HEAD --; then
-    echo "❌ Working tree not clean; commit or stash first"
+    echo "Working tree not clean; commit or stash first"
     exit 1
 fi
 
@@ -43,39 +51,39 @@ run_tests() {
     fi
 }
 
-run_tests || {
-    echo "❌ Tests failed; aborting release"
-    git checkout project.yml
-    exit 1
-}
+run_tests
 
-# 4. Archive
-ARCHIVE_PATH="$REPO_ROOT/build/Skillport-$VERSION.xcarchive"
-xcodebuild archive \
-    -scheme Skillport \
-    -destination 'generic/platform=macOS' \
-    -archivePath "$ARCHIVE_PATH" \
-    -configuration Release
-
-# 5. Export .app
+# 4. Build release app with ad-hoc signing
+DERIVED_DATA="$REPO_ROOT/build/release-derived-data-$VERSION"
 EXPORT_DIR="$REPO_ROOT/build/export-$VERSION"
-EXPORT_OPTIONS="$REPO_ROOT/build/ExportOptions.generated.plist"
+rm -rf "$DERIVED_DATA" "$EXPORT_DIR"
+
+xcodebuild \
+    -scheme Skillport \
+    -configuration Release \
+    -destination 'platform=macOS,arch=arm64' \
+    -derivedDataPath "$DERIVED_DATA" \
+    CODE_SIGN_STYLE=Manual \
+    CODE_SIGN_IDENTITY="-" \
+    MARKETING_VERSION="$VERSION" \
+    CURRENT_PROJECT_VERSION="$BUILD" \
+    build
+
+# 5. Stage .app and package DMG
 mkdir -p "$EXPORT_DIR"
-./Scripts/prepare-export-options.sh "$EXPORT_OPTIONS"
-xcodebuild -exportArchive \
-    -archivePath "$ARCHIVE_PATH" \
-    -exportPath "$EXPORT_DIR" \
-    -exportOptionsPlist "$EXPORT_OPTIONS"
+ditto "$DERIVED_DATA/Build/Products/Release/Skillport.app" "$EXPORT_DIR/Skillport.app"
+./Scripts/package-dmg.sh "$EXPORT_DIR/Skillport.app" "$VERSION" "$EXPORT_DIR"
 
 # 6. Commit + tag
-git add project.yml
+git add project.yml Skillport.xcodeproj/project.pbxproj
 git commit -m "chore(release): bump to v$VERSION build $BUILD"
 git tag "v$VERSION"
+PROJECT_VERSION_COMMITTED=true
+trap - ERR
 
 echo ""
-echo "✅ Release v$VERSION built to $EXPORT_DIR/Skillport.app"
+echo "Release v$VERSION built to $EXPORT_DIR/Skillport-$VERSION.dmg"
 echo ""
 echo "Next steps:"
-echo "  1. Notarize:       ./Scripts/notarize.sh \"$EXPORT_DIR/Skillport.app\""
-echo "  2. Publish appcast: ./Scripts/publish-appcast.sh \"$EXPORT_DIR\" $VERSION $BUILD"
-echo "  3. Push:           git push && git push --tags"
+echo "  1. Push: git push && git push --tags"
+echo "  2. Download DMG from the GitHub Release created by CI"
