@@ -1,7 +1,7 @@
 import Foundation
 import SwiftSoup
 
-public struct HTMLSanitizer {
+public struct HTMLSanitizer: Sendable {
     private static let allowedTags: Set<String> = [
         "p", "a", "ul", "ol", "li", "pre", "code", "blockquote",
         "strong", "em", "h1", "h2", "h3", "h4", "h5", "h6",

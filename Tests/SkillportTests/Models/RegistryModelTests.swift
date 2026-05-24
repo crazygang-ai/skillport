@@ -67,6 +67,33 @@ struct RegistryModelTests {
         }
     }
 
+    @Test("beginSelect(id:) updates selection before content fetch finishes")
+    func beginSelectUpdatesImmediately() async throws {
+        let model = makeModel()
+        model.skills = [
+            RegistrySkill(id: "a/b/b", skillId: "b", name: "B", installs: 1, source: "a/b")
+        ]
+        MockURLProtocol.stub(
+            urlMatch: { $0.host == "raw.githubusercontent.com" },
+            handler: { _ in
+                Thread.sleep(forTimeInterval: 0.2)
+                return .init(statusCode: 200, headers: [:], body: Data("# delayed".utf8))
+            }
+        )
+
+        let task = model.beginSelect(id: "a/b/b")
+
+        #expect(model.selectedID == "a/b/b")
+        #expect(model.isContentLoading == true)
+        if case .empty(let reason) = model.rendered {
+            #expect(reason == "Loading…")
+        } else {
+            Issue.record("expected loading state")
+        }
+        await task?.value
+        #expect(model.isContentLoading == false)
+    }
+
     @Test("select(id:) ignores stale slower content response")
     func selectRaceKeepsCurrentSelection() async throws {
         let model = makeModel()
@@ -115,7 +142,7 @@ struct RegistryModelTests {
         #expect(model.contentError != nil)
         switch model.rendered {
         case .empty(let reason):
-            #expect(reason == "Failed to load")
+            #expect(reason == "Documentation unavailable")
         default:
             Issue.record("expected .empty failure state")
         }

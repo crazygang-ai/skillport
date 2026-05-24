@@ -32,11 +32,11 @@ struct SkillportApp: App {
                     lifecycleDelegate.shutdown = { [container] in
                         await container.shutdown()
                     }
-                    async let refreshSkills: Void = {
-                        try? await container.skillsModel.refresh()
-                    }()
-                    async let refreshAgents: Void = container.skillsModel.refreshAgents()
-                    _ = await (refreshSkills, refreshAgents)
+                    do {
+                        try await container.skillsModel.refresh()
+                    } catch {
+                        await container.skillsModel.refreshAgents()
+                    }
                     await container.skillsModel.startWatching()
                 }
                 .frame(minWidth: 900, minHeight: 600)
@@ -70,7 +70,7 @@ struct SkillportApp: App {
             }
             CommandGroup(after: .appSettings) {
                 Button(String(localized: "Rescan")) {
-                    Task { try? await container.skillsModel.refresh() }
+                    Task { try? await container.skillsModel.refresh(forceAgentSearchPathRefresh: true) }
                 }
                 .keyboardShortcut("r", modifiers: .command)
                 Button(String(localized: "Check for Skill Updates")) {

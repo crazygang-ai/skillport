@@ -128,6 +128,8 @@ private struct AgentChip: View {
         .disabled(!isActionable)
         .opacity(agent.isInstalled ? 1 : 0.48)
         .help(helpText)
+        .accessibilityLabel("\(agent.id.displayName), \(statusText)")
+        .accessibilityHint(accessibilityHint)
     }
 
     private var isActionable: Bool {
@@ -176,21 +178,44 @@ private struct AgentChip: View {
     }
 
     private var helpText: String {
-        let availability = agent.isInstalled ? "" : " CLI not detected on this Mac."
+        let availability = agent.isInstalled ? "" : " CLI/config not detected on this Mac."
         if !isManagedBySkillport {
             return
-                "\(agent.id.displayName) assignment is external. Import the skill into Skillport before changing links.\(availability)"
+                "\(agent.id.displayName): external assignment. Import the skill into Skillport before changing links.\(availability)"
         }
         switch assignment {
         case .direct:
-            return "Unlink from \(agent.id.displayName).\(availability)"
+            return "\(agent.id.displayName): direct link. Click to unlink.\(availability)"
         case .inherited:
-            return "\(agent.id.displayName) inherits this skill through a fallback directory.\(availability)"
+            return
+                "\(agent.id.displayName): inherited through fallback. It can use this skill without a direct link.\(availability)"
         case .notAssigned:
             if agent.isInstalled {
-                return "Link to \(agent.id.displayName)."
+                return "\(agent.id.displayName): not assigned. Click to create a direct link."
             }
-            return "\(agent.id.displayName) is not detected on this Mac."
+            return "\(agent.id.displayName): not assigned; CLI/config not detected on this Mac."
+        }
+    }
+
+    private var statusText: String {
+        switch assignment {
+        case .direct:
+            return "Direct link"
+        case .inherited:
+            return "Inherited"
+        case .notAssigned:
+            return "Not assigned"
+        }
+    }
+
+    private var accessibilityHint: String {
+        switch assignment {
+        case .direct:
+            return isManagedBySkillport ? "Unlinks this skill from the agent." : helpText
+        case .inherited:
+            return "This agent receives the skill through a fallback directory."
+        case .notAssigned:
+            return isActionable ? "Creates a direct link for this agent." : helpText
         }
     }
 }

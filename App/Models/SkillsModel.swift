@@ -17,6 +17,7 @@ public final class SkillsModel {
     @ObservationIgnored private var subscription: Task<Void, Never>?
     @ObservationIgnored private var agentRefreshTask: Task<Void, Never>?
     @ObservationIgnored private var agentRefreshQueued = false
+    @ObservationIgnored private var agentRefreshNeedsPathRefresh = false
 
     public init(
         manager: SkillManagerActor,
@@ -76,16 +77,25 @@ public final class SkillsModel {
         }
     }
 
-    public func refresh() async throws {
+    public func refresh(forceAgentSearchPathRefresh: Bool = false) async throws {
         isScanning = true
         defer { isScanning = false }
+        let refreshedAgentsBeforeScan = !hasDetectedAgents
+        if !hasDetectedAgents {
+            await refreshAgents(forceSearchPathRefresh: forceAgentSearchPathRefresh)
+        }
         let list = try await manager.rescan(home: home)
         skills = list
-        await refreshAgents()
+        if !refreshedAgentsBeforeScan {
+            await refreshAgents(forceSearchPathRefresh: forceAgentSearchPathRefresh)
+        }
     }
 
     /// Re-probe which agent CLIs are on PATH without rescanning the filesystem.
-    public func refreshAgents() async {
+    public func refreshAgents(forceSearchPathRefresh: Bool = false) async {
+        if forceSearchPathRefresh {
+            agentRefreshNeedsPathRefresh = true
+        }
         guard !isDetectingAgents else {
             agentRefreshQueued = true
             return
@@ -96,10 +106,15 @@ public final class SkillsModel {
             hasDetectedAgents = true
         }
         repeat {
+            let shouldRefreshPath = agentRefreshNeedsPathRefresh
+            agentRefreshNeedsPathRefresh = false
             agentRefreshQueued = false
+            if shouldRefreshPath {
+                await detector.invalidateSearchPathCache()
+            }
             guard let map = try? await detector.detectAllStatuses(home: home) else { continue }
             agents = Self.agents(home: home, statuses: map)
-        } while agentRefreshQueued && !Task.isCancelled
+        } while (agentRefreshQueued || agentRefreshNeedsPathRefresh) && !Task.isCancelled
     }
 
     public func startWatching() async {
@@ -111,9 +126,12 @@ public final class SkillsModel {
     }
 
     public func toggle(skillName: String, agent: AgentID, install: Bool) async throws {
-        try await manager.toggleAgent(name: skillName, agent: agent, install: install, home: home)
-        // Re-scan directly to get deterministic state (stream propagation is async).
-        let list = try await manager.rescan(home: home)
+        let list = try await manager.toggleAgent(
+            name: skillName,
+            agent: agent,
+            install: install,
+            home: home
+        )
         skills = list
     }
 
@@ -122,8 +140,7 @@ public final class SkillsModel {
     }
 
     public func uninstall(name: String) async throws {
-        try await manager.uninstall(name: name, home: home)
-        let list = try await manager.rescan(home: home)
+        let list = try await manager.uninstall(name: name, home: home)
         skills = list
     }
 
@@ -135,15 +152,16 @@ public final class SkillsModel {
     }
 
     public func applyUpdate(name: String) async throws {
-        try await manager.applyUpdate(name: name, home: home)
-        let list = try await manager.rescan(home: home)
+        let list = try await manager.applyUpdate(name: name, home: home)
         skills = list
     }
 
     public func dismissUpdate(name: String, remoteHash: String) async throws {
+        let id = skills.first { $0.name == name }?.id
         try await manager.dismissUpdate(name: name, remoteHash: remoteHash)
-        let list = try await manager.rescan(home: home)
-        skills = list
+        if let id {
+            applyUpdateStatus(id: id, status: .upToDate)
+        }
     }
 
     public func skillsFiltered(by agent: AgentID?) -> [Skill] {

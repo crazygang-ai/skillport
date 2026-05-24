@@ -81,7 +81,7 @@ struct RegistrySidebar: View {
                     LazyVStack(alignment: .leading, spacing: 2) {
                         ForEach(model.skills) { skill in
                             Button {
-                                Task { await model.select(id: skill.id) }
+                                model.beginSelect(id: skill.id)
                             } label: {
                                 RegistryRow(skill: skill, isSelected: model.selectedID == skill.id)
                             }
@@ -92,7 +92,8 @@ struct RegistrySidebar: View {
                 }
             }
         }
-        .frame(minWidth: 300)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(nsColor: .controlBackgroundColor))
     }
 
     private func retry() async {

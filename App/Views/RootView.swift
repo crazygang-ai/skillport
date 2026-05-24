@@ -2,7 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppModel.self) private var appModel
-    @Environment(SkillsModel.self) private var skillsModel
+    @State private var requestedSidebarVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
         NavigationSplitView(columnVisibility: sidebarVisibility) {
@@ -15,15 +15,17 @@ struct RootView: View {
         .overlay { NotificationHost() }
     }
 
-    /// Editor 模式下隐藏侧边栏 —— 编辑 SKILL.md 时用户不需要看到 Dashboard/Registry/agent
-    /// 列表，让中间表单 + 右侧预览占满窗口。其它模式保留双列布局。
+    /// Editor 模式下临时隐藏侧边栏；其它模式尊重系统 sidebar toggle 按钮。
     private var sidebarVisibility: Binding<NavigationSplitViewVisibility> {
         Binding(
             get: {
                 if case .editor = appModel.section { return .detailOnly }
-                return .automatic
+                return requestedSidebarVisibility
             },
-            set: { _ in }
+            set: { newValue in
+                if case .editor = appModel.section { return }
+                requestedSidebarVisibility = newValue
+            }
         )
     }
 }

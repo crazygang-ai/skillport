@@ -6,27 +6,34 @@ struct RegistryDetailPanel: View {
     @Environment(NotificationModel.self) private var notifications
 
     var body: some View {
-        if let id = model.selectedID,
-            let skill = model.skills.first(where: { $0.id == id })
-        {
-            VStack(alignment: .leading, spacing: 0) {
-                header(skill)
-                installCommandBar(skill)
-                Divider()
-                RegistryContentView(
-                    rendered: model.rendered, isLoading: model.isContentLoading)
-                Divider()
-                agentSelector(skill)
+        Group {
+            if let id = model.selectedID,
+                let skill = model.skills.first(where: { $0.id == id })
+            {
+                VStack(alignment: .leading, spacing: 0) {
+                    header(skill)
+                    installCommandBar(skill)
+                    Divider()
+                    RegistryContentView(
+                        rendered: model.rendered, isLoading: model.isContentLoading
+                    )
+                    .layoutPriority(1)
+                    Divider()
+                    agentSelector(skill)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            } else {
+                VStack {
+                    Spacer()
+                    Text(String(localized: "Select a skill to see details"))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        } else {
-            VStack {
-                Spacer()
-                Text(String(localized: "Select a skill to see details"))
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
-            .frame(maxWidth: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     // MARK: - Header
@@ -34,7 +41,11 @@ struct RegistryDetailPanel: View {
     @ViewBuilder
     private func header(_ skill: RegistrySkill) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(skill.name).font(.title2).bold()
+            Text(skill.name)
+                .font(.title2)
+                .bold()
+                .lineLimit(1)
+                .truncationMode(.tail)
             HStack(spacing: 12) {
                 Label("\(skill.installs) installs", systemImage: "arrow.down.circle")
                 if let url = URL(string: "https://skills.sh/\(skill.id)") {
@@ -42,6 +53,8 @@ struct RegistryDetailPanel: View {
                 }
                 if let url = URL(string: "https://github.com/\(skill.source)") {
                     Link(skill.source, destination: url)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                 }
             }
             .font(.caption)
@@ -57,6 +70,8 @@ struct RegistryDetailPanel: View {
         HStack(spacing: 8) {
             Text(skill.installCommand)
                 .font(.system(.caption, design: .monospaced))
+                .lineLimit(1)
+                .truncationMode(.middle)
                 .padding(8)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.gray.opacity(0.1))

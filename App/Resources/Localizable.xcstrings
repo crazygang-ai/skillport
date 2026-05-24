@@ -820,6 +820,7 @@
       }
     },
     "Install to Skillport" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

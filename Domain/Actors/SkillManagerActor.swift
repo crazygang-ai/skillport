@@ -176,10 +176,16 @@ public actor SkillManagerActor {
         await watcher.stop()
     }
 
-    public func toggleAgent(name: String, agent: AgentID, install: Bool, home: URL) async throws {
+    @discardableResult
+    public func toggleAgent(
+        name: String,
+        agent: AgentID,
+        install: Bool,
+        home: URL
+    ) async throws -> [Skill] {
         try await installer.toggleAgent(name: name, agent: agent, install: install, home: home)
         // 重新扫以更新 installedAgents
-        _ = try await rescan(home: home)
+        return try await rescan(home: home)
     }
 
     public func installLocal(from source: URL, home: URL, installTo: Set<AgentID>) async throws -> Skill {
@@ -204,9 +210,10 @@ public actor SkillManagerActor {
         return skill
     }
 
-    public func uninstall(name: String, home: URL) async throws {
+    @discardableResult
+    public func uninstall(name: String, home: URL) async throws -> [Skill] {
         try await installer.uninstall(name: name, home: home)
-        _ = try await rescan(home: home)
+        return try await rescan(home: home)
     }
 
     public func checkAllUpdates(skills: [Skill]) async throws -> [SkillIdentity: UpdateStatus] {
@@ -224,7 +231,8 @@ public actor SkillManagerActor {
     }
 
     /// Apply a pending update: atomic swap on canonical, refresh lockfile baseline.
-    public func applyUpdate(name: String, home: URL) async throws {
+    @discardableResult
+    public func applyUpdate(name: String, home: URL) async throws -> [Skill] {
         let lock = try await lockFile.read()
         guard let locked = lock.skills.first(where: { $0.name == name }) else {
             throw SkillportError.unexpected("no lockfile entry for '\(name)'")
@@ -257,7 +265,7 @@ public actor SkillManagerActor {
         let id = SkillIdentity.compute(name: name, source: locked.source)
         updateStatuses[id] = .upToDate
         eventsContinuation.yield(.skillUpdateStatusChanged(id: id, status: .upToDate))
-        _ = try await rescan(home: home)
+        return try await rescan(home: home)
     }
 
     /// Record that the user dismissed an available update for this skill.

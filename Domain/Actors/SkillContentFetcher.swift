@@ -1,5 +1,6 @@
 import Foundation
 import OSLog
+import SwiftSoup
 
 public actor SkillContentFetcher {
     public static let htmlPrefix = "<!-- HTML -->"
@@ -114,7 +115,17 @@ public actor SkillContentFetcher {
             failures.append("skills.sh: \(error)")
         }
 
-        // Strategy 3: GitHub Tree API discovery
+        // Strategy 3: skills.sh HTML detail page → rendered SKILL.md block.
+        do {
+            let html = try await fetchFromSkillsShHTML(source: source, skillId: skillId)
+            let content = Self.htmlPrefix + html
+            contentCache[cacheKey] = (content, Date())
+            return content
+        } catch {
+            failures.append("skills.sh html: \(error)")
+        }
+
+        // Strategy 4: GitHub Tree API discovery
         do {
             let tree = try await discoverViaTreeAPI(source: source, skillId: skillId)
             contentCache[cacheKey] = (tree, Date())
@@ -183,6 +194,45 @@ public actor SkillContentFetcher {
             throw SkillportError.parseFailed(file: nil, reason: "non-utf8 skills.sh payload")
         }
         return try extractLargestTChunk(in: payload)
+    }
+
+    private func fetchFromSkillsShHTML(source: String, skillId: String) async throws -> String {
+        let url = skillsShBase.appendingPathComponent(source).appendingPathComponent(skillId)
+        var req = URLRequest(url: url)
+        req.setValue("text/html", forHTTPHeaderField: "Accept")
+        req.timeoutInterval = 10
+        let session = await sessionForRequest()
+        let (data, resp) = try await session.data(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode != 200 {
+            throw SkillportError.networkFailed(url: url, reason: "status \(http.statusCode)")
+        }
+        guard let html = String(data: data, encoding: .utf8) else {
+            throw SkillportError.parseFailed(file: nil, reason: "non-utf8 skills.sh html")
+        }
+        return try extractRenderedSkillHTML(in: html)
+    }
+
+    private func extractRenderedSkillHTML(in html: String) throws -> String {
+        let doc: Document
+        do {
+            doc = try SwiftSoup.parse(html)
+        } catch {
+            throw SkillportError.parseFailed(file: nil, reason: "skills.sh html parse: \(error)")
+        }
+        do {
+            guard let prose = try doc.select("div.prose").first() else {
+                throw SkillportError.parseFailed(file: nil, reason: "SKILL.md prose block not found")
+            }
+            let rendered = try prose.html()
+            guard !rendered.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw SkillportError.parseFailed(file: nil, reason: "SKILL.md prose block is empty")
+            }
+            return rendered
+        } catch let error as SkillportError {
+            throw error
+        } catch {
+            throw SkillportError.parseFailed(file: nil, reason: "skills.sh html extract: \(error)")
+        }
     }
 
     /// 找形如 `{ref}:T{hexSize},{html}` 的块里 size 最大的那段 — skills.sh 在该块塞 SKILL.md 渲染 HTML。

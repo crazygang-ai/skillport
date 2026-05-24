@@ -11,7 +11,7 @@ struct DashboardView: View {
     var body: some View {
         let list = skillsModel.skillsFiltered(by: app.currentAgentFilter)
         VStack {
-            if skillsModel.isScanning {
+            if skillsModel.isScanning && skillsModel.skills.isEmpty {
                 ProgressView(String(localized: "Scanning…"))
             } else if list.isEmpty {
                 emptyState
@@ -50,6 +50,16 @@ struct DashboardView: View {
                     )
                 }
                 .listStyle(.inset)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if skillsModel.isScanning && !skillsModel.skills.isEmpty {
+                ProgressView()
+                    .controlSize(.small)
+                    .padding(10)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                    .padding()
+                    .accessibilityLabel(String(localized: "Scanning…"))
             }
         }
         .navigationTitle(

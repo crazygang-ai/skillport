@@ -13,17 +13,24 @@ struct SidebarView: View {
                     .tag(SidebarSelection.registry)
             }
 
-            Section(String(localized: "Filter by agent")) {
-                if skillsModel.isDetectingAgents || !skillsModel.hasDetectedAgents {
-                    Label(String(localized: "Detecting agents..."), systemImage: "hourglass")
-                        .foregroundStyle(.secondary)
+            Section {
+                if skillsModel.hasDetectedAgents {
+                    ForEach(skillsModel.agents, id: \.id) { agent in
+                        SidebarAgentRow(
+                            agent: agent,
+                            count: skillsModel.skillCount(for: agent.id)
+                        )
+                        .tag(SidebarSelection.agent(agent.id))
+                    }
                 }
-                ForEach(skillsModel.agents, id: \.id) { agent in
-                    SidebarAgentRow(
-                        agent: agent,
-                        count: skillsModel.skillCount(for: agent.id)
-                    )
-                    .tag(SidebarSelection.agent(agent.id))
+            } header: {
+                HStack(spacing: 6) {
+                    Text(String(localized: "Filter by agent"))
+                    if skillsModel.isDetectingAgents || !skillsModel.hasDetectedAgents {
+                        ProgressView()
+                            .controlSize(.small)
+                            .accessibilityLabel(String(localized: "Detecting agents..."))
+                    }
                 }
             }
         }

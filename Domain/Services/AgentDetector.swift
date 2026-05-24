@@ -5,6 +5,7 @@ public struct AgentDetector: Sendable {
     private let shellOverride: String?
     private let fallbackPathOverride: String?
     private let loginShellTimeout: Duration
+    private let searchPathCache: AgentSearchPathCache
 
     public init(
         pathOverride: String? = nil,
@@ -16,6 +17,7 @@ public struct AgentDetector: Sendable {
         self.shellOverride = shellOverride
         self.fallbackPathOverride = fallbackPathOverride
         self.loginShellTimeout = loginShellTimeout
+        self.searchPathCache = AgentSearchPathCache()
     }
 
     public func isInstalled(agentID: AgentID) async throws -> Bool {
@@ -52,6 +54,10 @@ public struct AgentDetector: Sendable {
             )
         }
         return result
+    }
+
+    public func invalidateSearchPathCache() async {
+        await searchPathCache.invalidate()
     }
 
     // MARK: - Internals
@@ -93,15 +99,15 @@ public struct AgentDetector: Sendable {
     /// up the user's real PATH from rc files. Falls back to the process PATH if that fails.
     private func resolvedSearchPath() async -> String {
         if let override = pathOverride { return override }
-        if let loginPath = await loginShellPath(), !loginPath.isEmpty {
-            return loginPath
-        }
-        return fallbackPathOverride ?? ProcessInfo.processInfo.environment["PATH"] ?? ""
+        let shell = shellOverride ?? ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        return await searchPathCache.resolved(
+            shell: shell,
+            timeout: loginShellTimeout,
+            fallbackPathOverride: fallbackPathOverride
+        )
     }
 
-    private func loginShellPath() async -> String? {
-        let shell = shellOverride ?? ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        let timeout = loginShellTimeout
+    fileprivate static func loginShellPath(shell: String, timeout: Duration) async -> String? {
         let box = LoginShellProcessBox()
         return await withTaskGroup(of: String?.self) { group in
             group.addTask {
@@ -176,6 +182,45 @@ public struct AgentDetector: Sendable {
                 continuation.resume(returning: nil)
             }
         }
+    }
+}
+
+private actor AgentSearchPathCache {
+    private var cached: String?
+    private var inflight: Task<String, Never>?
+    private var generation = 0
+
+    func resolved(
+        shell: String,
+        timeout: Duration,
+        fallbackPathOverride: String?
+    ) async -> String {
+        if let cached { return cached }
+        if let inflight { return await inflight.value }
+
+        let currentGeneration = generation
+        let task = Task<String, Never> {
+            if let loginPath = await AgentDetector.loginShellPath(shell: shell, timeout: timeout),
+                !loginPath.isEmpty
+            {
+                return loginPath
+            }
+            return fallbackPathOverride ?? ProcessInfo.processInfo.environment["PATH"] ?? ""
+        }
+        inflight = task
+        let path = await task.value
+        if generation == currentGeneration {
+            cached = path
+            inflight = nil
+        }
+        return path
+    }
+
+    func invalidate() {
+        generation += 1
+        cached = nil
+        inflight?.cancel()
+        inflight = nil
     }
 }
 

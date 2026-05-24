@@ -70,6 +70,31 @@ struct SkillsModelTests {
         #expect(model.agents.first?.id == .codex)
     }
 
+    @Test("initial refresh publishes available-first agent order")
+    func initialRefreshPublishesAvailableFirstAgentOrder() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        try AgentsFS.createCanonicalSkill(in: dir.url, name: "alpha")
+        let bin = try dir.mkdir("bin")
+        let fake = bin.appendingPathComponent("codex")
+        try "#!/bin/sh\nexit 0\n".write(to: fake, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755], ofItemAtPath: fake.path)
+
+        let manager = makeManager(home: dir.url)
+        let model = SkillsModel(
+            manager: manager,
+            home: dir.url,
+            detector: AgentDetector(pathOverride: bin.path)
+        )
+
+        try await model.refresh()
+
+        #expect(model.hasDetectedAgents == true)
+        #expect(model.skills.count == 1)
+        #expect(model.agents.first?.id == .codex)
+    }
+
     @Test("refresh also updates agent availability when config dirs change")
     func refreshUpdatesAgentAvailability() async throws {
         let dir = try TempDir.create()

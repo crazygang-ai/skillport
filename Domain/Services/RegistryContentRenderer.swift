@@ -9,8 +9,7 @@ public enum RegistryRendered: Sendable {
     case attributed(AttributedString)
 }
 
-@MainActor
-public struct RegistryContentRenderer {
+public struct RegistryContentRenderer: Sendable {
     private let sanitizer: HTMLSanitizer
     private static let htmlPrefix = "<!-- HTML -->"
     private static let frontmatterPattern = #"\A---\r?\n[\s\S]*?\r?\n---\r?\n?"#
@@ -20,6 +19,15 @@ public struct RegistryContentRenderer {
     }
 
     public func render(
+        _ raw: String,
+        emptyMessage: String = "No documentation available"
+    ) async throws -> RegistryRendered {
+        try await Task.detached(priority: .userInitiated) {
+            try renderSynchronously(raw, emptyMessage: emptyMessage)
+        }.value
+    }
+
+    public func renderSynchronously(
         _ raw: String,
         emptyMessage: String = "No documentation available"
     ) throws -> RegistryRendered {

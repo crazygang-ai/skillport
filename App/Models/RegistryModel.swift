@@ -38,6 +38,7 @@ public final class RegistryModel {
     private let installHandler: InstallHandler
 
     private var debounceTask: Task<Void, Never>?
+    @ObservationIgnored private var selectionTask: Task<Void, Never>?
     private var selectionToken: UUID?
     private var listToken: UUID?
 
@@ -105,6 +106,13 @@ public final class RegistryModel {
     }
 
     public func select(id: String) async {
+        let task = beginSelect(id: id)
+        await task?.value
+    }
+
+    @discardableResult
+    public func beginSelect(id: String) -> Task<Void, Never>? {
+        selectionTask?.cancel()
         let token = UUID()
         selectionToken = token
         selectedID = id
@@ -113,25 +121,26 @@ public final class RegistryModel {
         selectedAgentsForInstall = []
         guard let skill = skills.first(where: { $0.id == id }) else {
             isContentLoading = false
-            return
+            return nil
         }
         isContentLoading = true
-        defer {
-            if isCurrentSelection(id: id, token: token) {
-                isContentLoading = false
+
+        let task = Task { [weak self, contentFetcher, renderer] in
+            do {
+                let raw = try await contentFetcher.fetchContent(
+                    source: skill.source, skillId: skill.skillId)
+                guard !Task.isCancelled else { return }
+                let next = try await renderer.render(raw)
+                guard !Task.isCancelled else { return }
+                self?.finishSelection(id: id, token: token, rendered: next)
+            } catch is CancellationError {
+                self?.finishCancelledSelection(id: id, token: token)
+            } catch {
+                self?.failSelection(id: id, token: token, error: error)
             }
         }
-        do {
-            let raw = try await contentFetcher.fetchContent(
-                source: skill.source, skillId: skill.skillId)
-            let next = try renderer.render(raw)
-            guard isCurrentSelection(id: id, token: token) else { return }
-            rendered = next
-        } catch {
-            guard isCurrentSelection(id: id, token: token) else { return }
-            contentError = String(describing: error)
-            rendered = .empty(reason: "Failed to load")
-        }
+        selectionTask = task
+        return task
     }
 
     public func toggleAgentForInstall(_ agent: AgentID) {
@@ -174,6 +183,28 @@ public final class RegistryModel {
 
     private func isCurrentSelection(id: String, token: UUID) -> Bool {
         selectedID == id && selectionToken == token
+    }
+
+    private func finishSelection(
+        id: String,
+        token: UUID,
+        rendered next: RegistryRendered
+    ) {
+        guard isCurrentSelection(id: id, token: token) else { return }
+        rendered = next
+        isContentLoading = false
+    }
+
+    private func failSelection(id: String, token: UUID, error: Error) {
+        guard isCurrentSelection(id: id, token: token) else { return }
+        contentError = String(describing: error)
+        rendered = .empty(reason: "Documentation unavailable")
+        isContentLoading = false
+    }
+
+    private func finishCancelledSelection(id: String, token: UUID) {
+        guard isCurrentSelection(id: id, token: token) else { return }
+        isContentLoading = false
     }
 
     private var trimmedSearchInput: String {

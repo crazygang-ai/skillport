@@ -27,6 +27,9 @@ struct RegistryContentView: View {
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 }

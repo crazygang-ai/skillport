@@ -158,6 +158,39 @@ struct SkillContentFetcherCascadeTests {
         #expect(content.contains("# from tree"))
     }
 
+    @Test("strategy 3 extracts rendered SKILL.md from skills.sh HTML detail page")
+    func strategy3SkillsShHTMLFallback() async throws {
+        MockURLProtocol.resetSync()
+        MockURLProtocol.stub(
+            urlMatch: { $0.host == "raw.githubusercontent.com" },
+            status: 404,
+            body: Data()
+        )
+        MockURLProtocol.stub(
+            urlMatch: { $0.host == "skills.sh" },
+            handler: { request in
+                if request.value(forHTTPHeaderField: "RSC") == "1" {
+                    return .init(statusCode: 200, headers: [:], body: Data("no T chunks".utf8))
+                }
+                let html = """
+                    <html><body>
+                    <div class="prose prose-invert max-w-none">
+                    <h1>HTML fallback</h1><p>Rendered SKILL content from detail page.</p>
+                    </div>
+                    </body></html>
+                    """
+                return .init(statusCode: 200, headers: [:], body: Data(html.utf8))
+            }
+        )
+
+        let fetcher = SkillContentFetcher(session: MockURLProtocol.makeSession())
+        let content = try await fetcher.fetchContent(source: "owner/repo", skillId: "sub")
+
+        #expect(content.hasPrefix("<!-- HTML -->"))
+        #expect(content.contains("HTML fallback"))
+        #expect(content.contains("Rendered SKILL content"))
+    }
+
     @Test("strategy 3 matches SKILL.md by exact parent directory")
     func strategy3TreeAPIAvoidsSubstringMatch() async throws {
         MockURLProtocol.resetSync()

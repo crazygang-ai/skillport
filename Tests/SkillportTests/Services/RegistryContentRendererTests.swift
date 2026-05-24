@@ -9,25 +9,25 @@ struct RegistryContentRendererTests {
     let renderer = RegistryContentRenderer()
 
     @Test("empty input yields .empty")
-    func emptyBranch() throws {
-        switch try renderer.render("") {
+    func emptyBranch() async throws {
+        switch try await renderer.render("") {
         case .empty: break
         default: Issue.record("expected .empty")
         }
     }
 
     @Test("whitespace-only input yields .empty")
-    func whitespaceBranch() throws {
-        switch try renderer.render("   \n\t  ") {
+    func whitespaceBranch() async throws {
+        switch try await renderer.render("   \n\t  ") {
         case .empty: break
         default: Issue.record("expected .empty")
         }
     }
 
     @Test("html-prefixed input goes through sanitizer + attributed branch")
-    func htmlBranch() throws {
+    func htmlBranch() async throws {
         let input = "<!-- HTML -->\n<p>hi there</p><script>x</script>"
-        switch try renderer.render(input) {
+        switch try await renderer.render(input) {
         case .attributed(let str):
             #expect(String(str.characters).contains("hi there"))
             #expect(!String(str.characters).contains("script"))
@@ -37,14 +37,14 @@ struct RegistryContentRendererTests {
     }
 
     @Test("markdown branch strips frontmatter before rendering")
-    func markdownStripsFrontmatter() throws {
+    func markdownStripsFrontmatter() async throws {
         let input = """
             ---
             description: hidden
             ---
             # Visible Heading
             """
-        switch try renderer.render(input) {
+        switch try await renderer.render(input) {
         case .markdown(let str):
             let s = String(str.characters)
             #expect(s.contains("Visible"))
@@ -55,8 +55,8 @@ struct RegistryContentRendererTests {
     }
 
     @Test("markdown with no frontmatter also renders body text")
-    func plainMarkdown() throws {
-        switch try renderer.render("# Plain\n\nparagraph here") {
+    func plainMarkdown() async throws {
+        switch try await renderer.render("# Plain\n\nparagraph here") {
         case .markdown(let str):
             let s = String(str.characters)
             #expect(s.contains("Plain"))
@@ -67,14 +67,14 @@ struct RegistryContentRendererTests {
     }
 
     @Test("nested lists render with indentation preserved")
-    func nestedListsRender() throws {
+    func nestedListsRender() async throws {
         let md = """
             - top
               - nested
               - also nested
             - sibling
             """
-        switch try renderer.render(md) {
+        switch try await renderer.render(md) {
         case .markdown(let str):
             let text = String(str.characters)
             #expect(text.contains("top"))
@@ -87,14 +87,14 @@ struct RegistryContentRendererTests {
     }
 
     @Test("markdown tables render as pipe-separated text with bold header")
-    func tableRender() throws {
+    func tableRender() async throws {
         let md = """
             | Name | Stars |
             |------|-------|
             | foo  | 100   |
             | bar  | 50    |
             """
-        switch try renderer.render(md) {
+        switch try await renderer.render(md) {
         case .markdown(let str):
             let text = String(str.characters)
             #expect(text.contains("Name"))
@@ -107,9 +107,9 @@ struct RegistryContentRendererTests {
     }
 
     @Test("markdown images render as text placeholder")
-    func imagePlaceholder() throws {
+    func imagePlaceholder() async throws {
         let md = "![logo](https://example.com/logo.png)"
-        switch try renderer.render(md) {
+        switch try await renderer.render(md) {
         case .markdown(let str):
             let text = String(str.characters)
             #expect(text.contains("Image"))
@@ -121,12 +121,12 @@ struct RegistryContentRendererTests {
     }
 
     @Test("markdown links keep only safe external URL schemes")
-    func markdownLinkSchemeAllowlist() throws {
+    func markdownLinkSchemeAllowlist() async throws {
         let md = """
             [web](https://example.com) [mail](mailto:a@example.com) \
             [file](file:///etc/passwd) [prefs](x-apple.systempreferences:com.apple.Security-Privacy)
             """
-        switch try renderer.render(md) {
+        switch try await renderer.render(md) {
         case .markdown(let str):
             let links = str.runs.compactMap { $0.link?.absoluteString }
             #expect(links.contains("https://example.com"))

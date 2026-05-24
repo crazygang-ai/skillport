@@ -122,4 +122,38 @@ struct AgentDetectorTests {
         let installed = try await detector.isInstalled(agentID: .claudeCode)
         #expect(installed == true)
     }
+
+    @Test("caches login shell PATH between detections")
+    func cachesLoginShellPath() async throws {
+        let dir = try TempDir.create()
+        defer { try? dir.cleanup() }
+        let bin = try dir.mkdir("bin")
+        let fakeClaude = bin.appendingPathComponent("claude")
+        try "#!/bin/sh\nexit 0\n".write(to: fakeClaude, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755], ofItemAtPath: fakeClaude.path)
+
+        let counter = dir.url.appendingPathComponent("counter")
+        let shell = dir.url.appendingPathComponent("path-shell")
+        let script = """
+            #!/bin/sh
+            printf x >> '\(counter.path)'
+            printf %s '\(bin.path)'
+            """
+        try script.write(to: shell, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755], ofItemAtPath: shell.path)
+
+        let detector = AgentDetector(
+            shellOverride: shell.path,
+            fallbackPathOverride: "",
+            loginShellTimeout: .seconds(1)
+        )
+
+        #expect(try await detector.isInstalled(agentID: .claudeCode) == true)
+        #expect(try await detector.detectAll()[.claudeCode] == true)
+
+        let count = (try? String(contentsOf: counter, encoding: .utf8)) ?? ""
+        #expect(count == "x")
+    }
 }

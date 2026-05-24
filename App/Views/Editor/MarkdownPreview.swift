@@ -7,18 +7,24 @@ import SwiftUI
 /// 全丢、换行全吞），无法满足 skill SKILL.md 那种长文排版。
 struct MarkdownPreview: View {
     let source: String
+    @State private var parsedNodes: [Markup] = []
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                let doc = Document(parsing: source)
-                ForEach(Array(doc.children.enumerated()), id: \.offset) { _, node in
+                ForEach(Array(parsedNodes.enumerated()), id: \.offset) { _, node in
                     BlockView(node: node, indent: 0)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
             .textSelection(.enabled)
+        }
+        .task(id: source) {
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            let doc = Document(parsing: source)
+            parsedNodes = Array(doc.children)
         }
     }
 }
