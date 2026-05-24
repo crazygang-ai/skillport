@@ -25,7 +25,7 @@ public final class RegistryModel {
     public var skills: [RegistrySkill] = []
     public var totalCount: Int = 0
     public var selectedID: String?
-    public var rendered: RegistryRendered = .empty(reason: "Select a skill")
+    public var rendered: RegistryRendered = .empty(reason: AppStrings.current()("Select a skill"))
     public var isLoading: Bool = false
     public var isContentLoading: Bool = false
     public var listError: String?
@@ -116,7 +116,7 @@ public final class RegistryModel {
         let token = UUID()
         selectionToken = token
         selectedID = id
-        rendered = .empty(reason: "Loading…")
+        rendered = .empty(reason: AppStrings.current()("Loading…"))
         contentError = nil
         selectedAgentsForInstall = []
         guard let skill = skills.first(where: { $0.id == id }) else {
@@ -198,7 +198,7 @@ public final class RegistryModel {
     private func failSelection(id: String, token: UUID, error: Error) {
         guard isCurrentSelection(id: id, token: token) else { return }
         contentError = String(describing: error)
-        rendered = .empty(reason: "Documentation unavailable")
+        rendered = .empty(reason: AppStrings.current()("Documentation unavailable"))
         isContentLoading = false
     }
 

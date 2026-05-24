@@ -91,6 +91,22 @@ struct SettingsModelM6Tests {
         defaults.removePersistentDomain(forName: suite)
     }
 
+    @Test("localized strings follow preferredLocale immediately")
+    func localizedStringsFollowPreferredLocale() async {
+        let suite = "test-\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        let model = SettingsModel(
+            proxyActor: ProxySettingsActor(suiteName: nil),
+            keychain: KeychainActor(service: "skillport-test-\(UUID())"),
+            defaults: defaults
+        )
+        model.setPreferredLocale("zh-Hans")
+
+        #expect(model.localized("Language") == "语言")
+        #expect(model.localized("Choose the app language") == "选择应用语言")
+        defaults.removePersistentDomain(forName: suite)
+    }
+
     @Test("autoCheckUpdates default true; toggling persists")
     func autoCheckDefault() async {
         let suite = "test-\(UUID())"

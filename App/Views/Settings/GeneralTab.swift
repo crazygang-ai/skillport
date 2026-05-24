@@ -3,6 +3,7 @@ import SwiftUI
 struct GeneralTab: View {
     @Environment(SettingsModel.self) private var settings
     @Environment(NotificationModel.self) private var notifications
+    @Environment(\.appStrings) private var strings
 
     private let locales: [(String, String)] = [
         ("en", "English"),
@@ -13,12 +14,13 @@ struct GeneralTab: View {
 
     var body: some View {
         Form {
-            Picker(String(localized: "Language"), selection: localeBinding) {
+            Picker(strings("Language"), selection: localeBinding) {
                 ForEach(locales, id: \.0) { code, name in
                     Text(name).tag(code)
                 }
             }
-            Text(String(localized: "Restart required for language change to take effect."))
+            .help(strings("Choose the app language"))
+            Text(strings("Language changes apply immediately."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -34,7 +36,7 @@ struct GeneralTab: View {
                 notifications.post(
                     .init(
                         level: .info,
-                        message: String(localized: "Language changed — please restart Skillport.")))
+                        message: settings.localized("Language changed.")))
             }
         )
     }

@@ -26,6 +26,7 @@ struct NotificationHost: View {
 private struct ToastView: View {
     let toast: Toast
     let onDismiss: () -> Void
+    @Environment(\.appStrings) private var strings
 
     var body: some View {
         HStack(spacing: 12) {
@@ -35,6 +36,8 @@ private struct ToastView: View {
             Spacer(minLength: 12)
             Button(action: onDismiss) { Image(systemName: "xmark") }
                 .buttonStyle(.plain)
+                .help(strings("Dismiss notification"))
+                .accessibilityLabel(strings("Dismiss notification"))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

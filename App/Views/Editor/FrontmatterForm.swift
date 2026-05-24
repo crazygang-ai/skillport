@@ -2,12 +2,13 @@ import SwiftUI
 
 struct FrontmatterForm: View {
     @Bindable var state: EditorState
+    @Environment(\.appStrings) private var strings
 
     var body: some View {
         Form {
             // Description 是多段长文（新版 skill 常有上千字），用 axis:.vertical + 弹性行数。
             TextField(
-                "Description",
+                strings("Description"),
                 text: Binding(
                     get: { state.metadata.description ?? "" },
                     set: {
@@ -18,8 +19,9 @@ struct FrontmatterForm: View {
                 axis: .vertical
             )
             .lineLimit(3...8)
+            .help(strings("Edit the skill description"))
             TextField(
-                "Version",
+                strings("Version"),
                 text: Binding(
                     get: { state.metadata.version ?? "" },
                     set: {
@@ -27,8 +29,9 @@ struct FrontmatterForm: View {
                         state.isDirty = true
                     }
                 ))
+                .help(strings("Edit the skill version"))
             TextField(
-                "Allowed tools (comma-separated)",
+                strings("Allowed tools (comma-separated)"),
                 text: Binding(
                     get: { (state.metadata.allowedTools ?? []).joined(separator: ", ") },
                     set: {
@@ -39,6 +42,7 @@ struct FrontmatterForm: View {
                         state.isDirty = true
                     }
                 ))
+                .help(strings("Edit allowed tools as a comma-separated list"))
         }
         .padding()
     }

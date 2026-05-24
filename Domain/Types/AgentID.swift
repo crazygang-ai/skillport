@@ -14,6 +14,16 @@ public enum AgentID: String, CaseIterable, Codable, Hashable, Sendable {
     case trae
 }
 
+public struct AgentVisualIdentity: Sendable, Equatable {
+    public let assetName: String
+    public let fallbackInitials: String
+
+    public init(assetName: String, fallbackInitials: String) {
+        self.assetName = assetName
+        self.fallbackInitials = fallbackInitials
+    }
+}
+
 extension AgentID {
     /// UI 展示名称。
     public var displayName: String {
@@ -46,6 +56,34 @@ extension AgentID {
         case .codebuddy: return "codebuddy"
         case .openclaw: return "openclaw"
         case .trae: return "trae"
+        }
+    }
+
+    /// Shared visual identity for agent-facing UI surfaces.
+    public var visualIdentity: AgentVisualIdentity {
+        switch self {
+        case .claudeCode:
+            AgentVisualIdentity(assetName: "agent-claude-code", fallbackInitials: "CC")
+        case .codex:
+            AgentVisualIdentity(assetName: "agent-codex", fallbackInitials: "CX")
+        case .gemini:
+            AgentVisualIdentity(assetName: "agent-gemini-cli", fallbackInitials: "GM")
+        case .copilot:
+            AgentVisualIdentity(assetName: "agent-copilot", fallbackInitials: "CP")
+        case .opencode:
+            AgentVisualIdentity(assetName: "agent-opencode", fallbackInitials: "OC")
+        case .antigravity:
+            AgentVisualIdentity(assetName: "agent-antigravity", fallbackInitials: "AG")
+        case .cursor:
+            AgentVisualIdentity(assetName: "agent-cursor", fallbackInitials: "CU")
+        case .kiro:
+            AgentVisualIdentity(assetName: "agent-kiro", fallbackInitials: "KI")
+        case .codebuddy:
+            AgentVisualIdentity(assetName: "agent-codebuddy", fallbackInitials: "CB")
+        case .openclaw:
+            AgentVisualIdentity(assetName: "agent-openclaw", fallbackInitials: "OW")
+        case .trae:
+            AgentVisualIdentity(assetName: "agent-trae", fallbackInitials: "TR")
         }
     }
 }

@@ -7,6 +7,7 @@ struct SkillEditorView: View {
     @Environment(AppModel.self) private var app
     @Environment(SkillsModel.self) private var skillsModel
     @Environment(NotificationModel.self) private var notifications
+    @Environment(\.appStrings) private var strings
     @State private var state = EditorState()
     @State private var source: String = ""
 
@@ -26,34 +27,34 @@ struct SkillEditorView: View {
             MarkdownPreview(source: source)
                 .frame(minWidth: 320)
         }
-        .navigationTitle(state.filePath?.lastPathComponent ?? String(localized: "Editor"))
+        .navigationTitle(state.filePath?.lastPathComponent ?? strings("Editor"))
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button {
                     app.setSection(.dashboard)
                 } label: {
-                    Label(String(localized: "Back"), systemImage: "chevron.left")
+                    Label(strings("Back"), systemImage: "chevron.left")
                 }
-                .help(String(localized: "Back to Dashboard"))
+                .help(strings("Back to Dashboard"))
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     do {
                         try state.save()
                         notifications.post(
-                            .init(level: .success, message: String(localized: "Saved.")))
+                            .init(level: .success, message: strings("Saved.")))
                     } catch {
                         notifications.post(
                             .init(
                                 level: .error,
-                                message: String(
-                                    localized: "Save failed: \(error.localizedDescription)")))
+                                message: strings("Save failed: \(error.localizedDescription)")))
                     }
                 } label: {
-                    Label(String(localized: "Save"), systemImage: "square.and.arrow.down")
+                    Label(strings("Save"), systemImage: "square.and.arrow.down")
                 }
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled(!state.isDirty)
+                .help(strings("Save changes to SKILL.md"))
             }
         }
         .task(id: skillID) {
@@ -65,8 +66,7 @@ struct SkillEditorView: View {
                     notifications.post(
                         .init(
                             level: .error,
-                            message: String(
-                                localized: "Load failed: \(error.localizedDescription)")))
+                            message: strings("Load failed: \(error.localizedDescription)")))
                 }
             }
         }

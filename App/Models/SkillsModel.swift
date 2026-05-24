@@ -65,19 +65,20 @@ public final class SkillsModel {
     }
 
     private static func message(for error: SkillportError) -> String {
+        let strings = AppStrings.current()
         switch error {
         case .invalidLockFile(let reason):
-            return String(localized: "Lockfile invalid: \(reason). Continuing without it.")
+            return strings("Lockfile invalid: \(reason). Continuing without it.")
         case .fileIO(let path, let reason):
-            return String(localized: "I/O error at \(path.lastPathComponent): \(reason)")
+            return strings("I/O error at \(path.lastPathComponent): \(reason)")
         case .gitFailed(_, let stderr):
-            return String(localized: "git failed: \(stderr)")
+            return strings("git failed: \(stderr)")
         case .networkFailed(_, let reason):
-            return String(localized: "Network error: \(reason)")
+            return strings("Network error: \(reason)")
         case .parseFailed(_, let reason):
-            return String(localized: "Parse failed: \(reason)")
+            return strings("Parse failed: \(reason)")
         case .keychainFailed(let status):
-            return String(localized: "Keychain error: \(status)")
+            return strings("Keychain error: \(status)")
         case .unexpected(let s):
             return s
         }

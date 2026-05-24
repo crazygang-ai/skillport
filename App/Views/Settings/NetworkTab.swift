@@ -3,6 +3,7 @@ import SwiftUI
 struct NetworkTab: View {
     @Environment(SettingsModel.self) private var settings
     @Environment(NotificationModel.self) private var notifications
+    @Environment(\.appStrings) private var strings
     @State private var password: String = ""
     @State private var loadedPassword: Bool = false
     @State private var bypassListText: String = ""
@@ -14,27 +15,34 @@ struct NetworkTab: View {
 
     var body: some View {
         Form {
-            Toggle(String(localized: "Enable proxy"), isOn: proxyEnabledBinding)
+            Toggle(strings("Enable proxy"), isOn: proxyEnabledBinding)
+                .help(strings("Enable the network proxy"))
 
             if settings.proxy.enabled {
-                Picker(String(localized: "Type"), selection: proxyKindBinding) {
+                Picker(strings("Type"), selection: proxyKindBinding) {
                     Text("HTTPS").tag(ProxyConfig.Kind.https)
                     Text("SOCKS5").tag(ProxyConfig.Kind.socks5)
                 }
-                TextField(String(localized: "Host"), text: proxyHostBinding)
+                .help(strings("Choose proxy type"))
+                TextField(strings("Host"), text: proxyHostBinding)
+                    .help(strings("Proxy host name or IP address"))
                 TextField(
-                    String(localized: "Port"), value: proxyPortBinding,
+                    strings("Port"), value: proxyPortBinding,
                     formatter: NumberFormatter()
                 )
-                TextField(String(localized: "Username (optional)"), text: proxyUsernameBinding)
+                .help(strings("Proxy port number"))
+                TextField(strings("Username (optional)"), text: proxyUsernameBinding)
+                    .help(strings("Optional proxy username"))
                 SecureField(
-                    String(localized: "Password (stored in Keychain)"), text: $password
+                    strings("Password (stored in Keychain)"), text: $password
                 )
-                Button(String(localized: "Save password")) {
+                .help(strings("Proxy password stored in Keychain"))
+                Button(strings("Save password")) {
                     Task { await savePassword() }
                 }
+                .help(strings("Save proxy password to Keychain"))
                 TextField(
-                    String(localized: "Bypass proxy for"),
+                    strings("Bypass proxy for"),
                     text: $bypassListText,
                     prompt: Text("localhost, 127.0.0.1, *.local"),
                     axis: .vertical
@@ -44,6 +52,7 @@ struct NetworkTab: View {
                 .onChange(of: bypassListText) { _, newValue in
                     applyBypassList(newValue)
                 }
+                .help(strings("Comma-separated hosts that bypass the proxy"))
             }
         }
         .formStyle(.grouped)
@@ -70,12 +79,12 @@ struct NetworkTab: View {
                 try await settings.setProxyPassword(password)
             }
             notifications.post(
-                .init(level: .success, message: String(localized: "Proxy password saved")))
+                .init(level: .success, message: strings("Proxy password saved")))
         } catch {
             notifications.post(
                 .init(
                     level: .error,
-                    message: String(localized: "Failed to save password: \(error.localizedDescription)")))
+                    message: strings("Failed to save password: \(error.localizedDescription)")))
         }
     }
 

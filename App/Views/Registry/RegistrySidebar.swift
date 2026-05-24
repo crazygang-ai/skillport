@@ -2,19 +2,21 @@ import SwiftUI
 
 struct RegistrySidebar: View {
     @Bindable var model: RegistryModel
+    @Environment(\.appStrings) private var strings
 
     var body: some View {
         VStack(spacing: 0) {
             // Search
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField(String(localized: "Search skills"), text: $model.searchInput)
+                TextField(strings("Search skills"), text: $model.searchInput)
                     .textFieldStyle(.plain)
             }
             .padding(8)
             .background(Color.gray.opacity(0.1))
             .cornerRadius(6)
             .padding(8)
+            .help(strings("Search registry skills"))
 
             // Category tabs (hidden when searching)
             if model.searchInput.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -34,6 +36,7 @@ struct RegistrySidebar: View {
                                 .cornerRadius(4)
                         }
                         .buttonStyle(.plain)
+                        .help(help(for: c))
                     }
                     Spacer()
                     if model.totalCount > 0 {
@@ -52,7 +55,7 @@ struct RegistrySidebar: View {
             } else if let listError = model.listError {
                 VStack(alignment: .leading, spacing: 8) {
                     Label(
-                        String(localized: "Unable to load skills"),
+                        strings("Unable to load skills"),
                         systemImage: "exclamationmark.triangle"
                     )
                     .font(.callout)
@@ -60,17 +63,18 @@ struct RegistrySidebar: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
-                    Button(String(localized: "Retry")) {
+                    Button(strings("Retry")) {
                         Task { await retry() }
                     }
+                    .help(strings("Retry loading skills"))
                 }
                 .padding()
                 Spacer()
             } else if model.skills.isEmpty {
                 Text(
                     model.searchInput.isEmpty
-                        ? String(localized: "No skills available")
-                        : String(localized: "No results")
+                        ? strings("No skills available")
+                        : strings("No results")
                 )
                 .font(.callout)
                 .foregroundStyle(.secondary)
@@ -86,6 +90,7 @@ struct RegistrySidebar: View {
                                 RegistryRow(skill: skill, isSelected: model.selectedID == skill.id)
                             }
                             .buttonStyle(.plain)
+                            .help(strings("Show skill details"))
                         }
                     }
                     .padding(.horizontal, 4)
@@ -106,9 +111,17 @@ struct RegistrySidebar: View {
 
     private func label(for c: LeaderboardCategory) -> String {
         switch c {
-        case .allTime: return String(localized: "All Time")
-        case .trending: return String(localized: "Trending")
-        case .hot: return String(localized: "Hot")
+        case .allTime: return strings("All Time")
+        case .trending: return strings("Trending")
+        case .hot: return strings("Hot")
+        }
+    }
+
+    private func help(for c: LeaderboardCategory) -> String {
+        switch c {
+        case .allTime: return strings("Show all-time leaderboard")
+        case .trending: return strings("Show trending skills")
+        case .hot: return strings("Show hot skills")
         }
     }
 }

@@ -10,9 +10,9 @@ public final class SettingsModel {
         didSet { defaults.set(autoCheckUpdates, forKey: Self.autoCheckKey) }
     }
 
-    public static let autoCheckKey = "autoCheckUpdates"
-    public static let appleLanguagesKey = "AppleLanguages"
-    public static let keychainProxyAccount = ProxySettingsActor.proxyPasswordAccount
+    public nonisolated static let autoCheckKey = "autoCheckUpdates"
+    public nonisolated static let appleLanguagesKey = "AppleLanguages"
+    public nonisolated static let keychainProxyAccount = ProxySettingsActor.proxyPasswordAccount
 
     private let proxyActor: ProxySettingsActor
     private let keychain: KeychainActor
@@ -59,7 +59,11 @@ public final class SettingsModel {
         defaults.set(current, forKey: Self.appleLanguagesKey)
     }
 
-    public static func normalizedLocale(_ locale: String) -> String {
+    public func localized(_ value: String.LocalizationValue) -> String {
+        AppStrings(localeIdentifier: preferredLocale)(value)
+    }
+
+    public nonisolated static func normalizedLocale(_ locale: String) -> String {
         let normalized =
             locale
             .trimmingCharacters(in: .whitespacesAndNewlines)

@@ -1,20 +1,32 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @Environment(\.appStrings) private var strings
+
     var body: some View {
         TabView {
             GeneralTab()
-                .tabItem { Label(String(localized: "General"), systemImage: "gearshape") }
+                .tabItem {
+                    Label(strings("General"), systemImage: "gearshape")
+                        .help(strings("Open general settings"))
+                }
             NetworkTab()
-                .tabItem { Label(String(localized: "Network"), systemImage: "network") }
+                .tabItem {
+                    Label(strings("Network"), systemImage: "network")
+                        .help(strings("Open network settings"))
+                }
             UpdatesTab()
                 .tabItem {
                     Label(
-                        String(localized: "Updates"),
+                        strings("Updates"),
                         systemImage: "arrow.triangle.2.circlepath")
+                        .help(strings("Open update settings"))
                 }
             AboutTab()
-                .tabItem { Label(String(localized: "About"), systemImage: "info.circle") }
+                .tabItem {
+                    Label(strings("About"), systemImage: "info.circle")
+                        .help(strings("Open app information"))
+                }
         }
         .frame(width: 520, height: 380)
     }

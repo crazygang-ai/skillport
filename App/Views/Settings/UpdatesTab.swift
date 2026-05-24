@@ -3,32 +3,34 @@ import SwiftUI
 struct UpdatesTab: View {
     @Environment(SettingsModel.self) private var settings
     @Environment(UpdateModel.self) private var update
+    @Environment(\.appStrings) private var strings
 
     var body: some View {
         Form {
             Toggle(
-                String(localized: "Automatically check for updates"),
+                strings("Automatically check for updates"),
                 isOn: autoCheckBinding
             )
+            .help(strings("Check for app updates automatically"))
             HStack {
                 if let last = update.lastCheck {
                     Text(
-                        String(
-                            localized:
-                                "Last checked \(last.formatted(date: .abbreviated, time: .shortened))"
+                        strings(
+                            "Last checked \(last.formatted(date: .abbreviated, time: .shortened))"
                         )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 } else {
-                    Text(String(localized: "Never checked for updates"))
+                    Text(strings("Never checked for updates"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button(String(localized: "Check now")) {
+                Button(strings("Check now")) {
                     update.checkNow()
                 }
+                .help(strings("Check for app updates now"))
             }
         }
         .formStyle(.grouped)

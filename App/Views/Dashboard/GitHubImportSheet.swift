@@ -4,6 +4,7 @@ struct GitHubImportSheet: View {
     @Environment(SkillsModel.self) private var skills
     @Environment(NotificationModel.self) private var notifications
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appStrings) private var strings
 
     @State private var repoInput = ""
     @State private var skillIdInput = ""
@@ -12,23 +13,25 @@ struct GitHubImportSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(String(localized: "Import from GitHub"))
+            Text(strings("Import from GitHub"))
                 .font(.title3)
                 .bold()
 
             Form {
                 TextField(
-                    String(localized: "Repository"),
+                    strings("Repository"),
                     text: $repoInput,
                     prompt: Text("owner/repo")
                 )
+                .help(strings("Enter a GitHub repository as owner/repo"))
                 TextField(
-                    String(localized: "Skill ID (optional)"),
+                    strings("Skill ID (optional)"),
                     text: $skillIdInput,
                     prompt: Text("subskill")
                 )
+                .help(strings("Enter a subskill ID when the repository contains multiple skills"))
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(String(localized: "Install to agents"))
+                    Text(strings("Install to agents"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     RegistryAgentChipsFlow(
@@ -47,9 +50,10 @@ struct GitHubImportSheet: View {
 
             HStack {
                 Spacer()
-                Button(String(localized: "Cancel")) {
+                Button(strings("Cancel")) {
                     dismiss()
                 }
+                .help(strings("Cancel import"))
                 Button {
                     Task { await install() }
                 } label: {
@@ -57,11 +61,12 @@ struct GitHubImportSheet: View {
                         ProgressView()
                             .controlSize(.small)
                     } else {
-                        Text(String(localized: "Import"))
+                        Text(strings("Import"))
                     }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(repoInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isInstalling)
+                .help(strings("Import this GitHub skill"))
             }
         }
         .padding(20)
@@ -79,13 +84,13 @@ struct GitHubImportSheet: View {
                 installTo: selectedAgents
             )
             notifications.post(
-                .init(level: .success, message: String(localized: "Imported \(installed.name)")))
+                .init(level: .success, message: strings("Imported \(installed.name)")))
             dismiss()
         } catch {
             notifications.post(
                 .init(
                     level: .error,
-                    message: String(localized: "Import failed: \(error.localizedDescription)")))
+                    message: strings("Import failed: \(error.localizedDescription)")))
         }
     }
 }

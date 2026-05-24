@@ -6,6 +6,7 @@ struct DashboardView: View {
     @Environment(AppModel.self) private var app
     @Environment(SkillsModel.self) private var skillsModel
     @Environment(NotificationModel.self) private var notifications
+    @Environment(\.appStrings) private var strings
     @State private var isDropTargeted = false
     @State private var pendingUninstall: Skill?
     @State private var searchText = ""
@@ -21,7 +22,7 @@ struct DashboardView: View {
         VStack(spacing: 0) {
             dashboardControls
             if skillsModel.isScanning && skillsModel.skills.isEmpty {
-                ProgressView(String(localized: "Scanning…"))
+                ProgressView(strings("Scanning…"))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if list.isEmpty {
                 emptyState
@@ -42,9 +43,8 @@ struct DashboardView: View {
                                     notifications.post(
                                         .init(
                                             level: .error,
-                                            message: String(
-                                                localized:
-                                                    "Toggle failed: \(error.localizedDescription)")))
+                                            message: strings(
+                                                "Toggle failed: \(error.localizedDescription)")))
                                 }
                             }
                         },
@@ -76,24 +76,26 @@ struct DashboardView: View {
                     .padding(10)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
                     .padding()
-                    .accessibilityLabel(String(localized: "Scanning…"))
+                    .accessibilityLabel(strings("Scanning…"))
             }
         }
         .navigationTitle(
-            app.currentAgentFilter?.displayName ?? String(localized: "All Skills")
+            app.currentAgentFilter?.displayName ?? strings("All Skills")
         )
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
                     showingGitHubImport = true
                 } label: {
-                    Label(String(localized: "Import from GitHub"), systemImage: "globe")
+                    Label(strings("Import from GitHub"), systemImage: "globe")
                 }
+                .help(strings("Import a skill from GitHub"))
                 Button {
                     importLocalSkill()
                 } label: {
-                    Label(String(localized: "Import Skill…"), systemImage: "folder.badge.plus")
+                    Label(strings("Import Skill…"), systemImage: "folder.badge.plus")
                 }
+                .help(strings("Import a local skill folder"))
             }
             ToolbarItemGroup(placement: .automatic) {
                 Button {
@@ -101,13 +103,15 @@ struct DashboardView: View {
                         try? await skillsModel.refresh(forceAgentSearchPathRefresh: true)
                     }
                 } label: {
-                    Label(String(localized: "Rescan"), systemImage: "arrow.clockwise")
+                    Label(strings("Rescan"), systemImage: "arrow.clockwise")
                 }
+                .help(strings("Scan local skills and agents"))
                 Button {
                     Task { await checkAllUpdates() }
                 } label: {
-                    Label(String(localized: "Check for Skill Updates"), systemImage: "arrow.down.circle")
+                    Label(strings("Check for Skill Updates"), systemImage: "arrow.down.circle")
                 }
+                .help(strings("Check all skills for updates"))
             }
         }
         .sheet(isPresented: $showingGitHubImport) {
@@ -127,36 +131,39 @@ struct DashboardView: View {
             return true
         }
         .confirmationDialog(
-            String(localized: "Delete Skill"),
+            strings("Delete Skill"),
             isPresented: uninstallDialogBinding,
             presenting: pendingUninstall
         ) { skill in
-            Button(String(localized: "Delete"), role: .destructive) {
+            Button(strings("Delete"), role: .destructive) {
                 Task { await uninstall(skill) }
             }
-            Button(String(localized: "Cancel"), role: .cancel) {}
+            .help(strings("Delete this skill"))
+            Button(strings("Cancel"), role: .cancel) {}
+                .help(strings("Cancel deletion"))
         } message: { skill in
             Text(
-                String(
-                    localized:
-                        "Delete \(skill.name) everywhere from Skillport? This removes the shared skill, all direct links, and update metadata."
+                strings(
+                    "Delete \(skill.name) everywhere from Skillport? This removes the shared skill, all direct links, and update metadata."
                 ))
         }
     }
 
     private var dashboardControls: some View {
         HStack(spacing: 12) {
-            TextField(String(localized: "Search installed skills"), text: $searchText)
+            TextField(strings("Search installed skills"), text: $searchText)
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 320)
+                .help(strings("Filter installed skills by name"))
 
-            Picker(String(localized: "Ownership"), selection: $ownershipFilter) {
-                Text(String(localized: "All")).tag(SkillOwnershipFilter.all)
-                Text(String(localized: "Skillport")).tag(SkillOwnershipFilter.managed)
-                Text(String(localized: "External")).tag(SkillOwnershipFilter.external)
+            Picker(strings("Ownership"), selection: $ownershipFilter) {
+                Text(strings("All")).tag(SkillOwnershipFilter.all)
+                Text(strings("Skillport")).tag(SkillOwnershipFilter.managed)
+                Text(strings("External")).tag(SkillOwnershipFilter.external)
             }
             .pickerStyle(.segmented)
             .frame(width: 260)
+            .help(strings("Filter skills by ownership"))
 
             Spacer()
         }
@@ -169,22 +176,20 @@ struct DashboardView: View {
         if let agent = app.currentAgentFilter, !skillsModel.skills.isEmpty {
             // 有 skills 但没有装到当前 agent
             ContentUnavailableView(
-                String(localized: "No skills installed to \(agent.displayName)"),
+                strings("No skills installed to \(agent.displayName)"),
                 systemImage: "cube",
                 description: Text(
-                    String(
-                        localized:
-                            "Clear the agent filter (click title) and toggle \(agent.displayName) on a skill."
+                    strings(
+                        "Clear the agent filter (click title) and toggle \(agent.displayName) on a skill."
                     ))
             )
         } else {
             // 完全没 skills
             ContentUnavailableView(
-                String(localized: "No skills yet"),
+                strings("No skills yet"),
                 systemImage: "sparkles",
                 description: Text(
-                    String(
-                        localized: "Drop a folder with SKILL.md here to import, or use ⌘N."))
+                    strings("Drop a folder with SKILL.md here to import, or use ⌘N."))
             )
         }
     }
@@ -197,12 +202,12 @@ struct DashboardView: View {
                 notifications.post(
                     .init(
                         level: .success,
-                        message: String(localized: "Imported \(url.lastPathComponent)")))
+                        message: strings("Imported \(url.lastPathComponent)")))
             } catch {
                 notifications.post(
                     .init(
                         level: .error,
-                        message: String(localized: "Import failed: \(error.localizedDescription)")))
+                        message: strings("Import failed: \(error.localizedDescription)")))
             }
         }
     }
@@ -215,13 +220,12 @@ struct DashboardView: View {
                 notifications.post(
                     .init(
                         level: .success,
-                        message: String(localized: "Imported \(url.lastPathComponent)")))
+                        message: strings("Imported \(url.lastPathComponent)")))
             } catch {
                 notifications.post(
                     .init(
                         level: .error,
-                        message: String(
-                            localized: "Import failed: \(error.localizedDescription)")))
+                        message: strings("Import failed: \(error.localizedDescription)")))
             }
         }
     }
@@ -231,7 +235,7 @@ struct DashboardView: View {
         pb.clearContents()
         pb.setString(skill.path.path, forType: .string)
         notifications.post(
-            .init(level: .success, message: String(localized: "Copied skill path")))
+            .init(level: .success, message: strings("Copied skill path")))
     }
 
     private func checkAllUpdates() async {
@@ -245,14 +249,14 @@ struct DashboardView: View {
                 .init(
                     level: available > 0 ? .info : .success,
                     message: available > 0
-                        ? String(localized: "\(available) skill updates available")
-                        : String(localized: "All skills are up to date")
+                        ? strings("\(available) skill updates available")
+                        : strings("All skills are up to date")
                 ))
         } catch {
             notifications.post(
                 .init(
                     level: .error,
-                    message: String(localized: "Update check failed: \(error.localizedDescription)")
+                    message: strings("Update check failed: \(error.localizedDescription)")
                 ))
         }
     }
@@ -261,12 +265,12 @@ struct DashboardView: View {
         do {
             try await skillsModel.applyUpdate(name: skill.name)
             notifications.post(
-                .init(level: .success, message: String(localized: "Updated \(skill.name)")))
+                .init(level: .success, message: strings("Updated \(skill.name)")))
         } catch {
             notifications.post(
                 .init(
                     level: .error,
-                    message: String(localized: "Update failed: \(error.localizedDescription)")))
+                    message: strings("Update failed: \(error.localizedDescription)")))
         }
     }
 
@@ -274,12 +278,12 @@ struct DashboardView: View {
         do {
             try await skillsModel.dismissUpdate(name: skill.name, remoteHash: remoteHash)
             notifications.post(
-                .init(level: .success, message: String(localized: "Dismissed update for \(skill.name)")))
+                .init(level: .success, message: strings("Dismissed update for \(skill.name)")))
         } catch {
             notifications.post(
                 .init(
                     level: .error,
-                    message: String(localized: "Dismiss failed: \(error.localizedDescription)")))
+                    message: strings("Dismiss failed: \(error.localizedDescription)")))
         }
     }
 
@@ -288,12 +292,12 @@ struct DashboardView: View {
             try await skillsModel.uninstall(name: skill.name)
             pendingUninstall = nil
             notifications.post(
-                .init(level: .success, message: String(localized: "Deleted \(skill.name)")))
+                .init(level: .success, message: strings("Deleted \(skill.name)")))
         } catch {
             notifications.post(
                 .init(
                     level: .error,
-                    message: String(localized: "Delete failed: \(error.localizedDescription)")))
+                    message: strings("Delete failed: \(error.localizedDescription)")))
         }
     }
 

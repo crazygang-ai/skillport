@@ -86,7 +86,7 @@ struct RegistryModelTests {
         #expect(model.selectedID == "a/b/b")
         #expect(model.isContentLoading == true)
         if case .empty(let reason) = model.rendered {
-            #expect(reason == "Loading…")
+            #expect(reason == AppStrings.current()("Loading…"))
         } else {
             Issue.record("expected loading state")
         }
@@ -142,7 +142,7 @@ struct RegistryModelTests {
         #expect(model.contentError != nil)
         switch model.rendered {
         case .empty(let reason):
-            #expect(reason == "Documentation unavailable")
+            #expect(reason == AppStrings.current()("Documentation unavailable"))
         default:
             Issue.record("expected .empty failure state")
         }

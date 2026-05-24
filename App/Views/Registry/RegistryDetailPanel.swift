@@ -4,6 +4,7 @@ struct RegistryDetailPanel: View {
     @Bindable var model: RegistryModel
     @Environment(SkillsModel.self) private var skills
     @Environment(NotificationModel.self) private var notifications
+    @Environment(\.appStrings) private var strings
 
     var body: some View {
         Group {
@@ -25,7 +26,7 @@ struct RegistryDetailPanel: View {
             } else {
                 VStack {
                     Spacer()
-                    Text(String(localized: "Select a skill to see details"))
+                    Text(strings("Select a skill to see details"))
                         .foregroundStyle(.secondary)
                     Spacer()
                 }
@@ -47,14 +48,16 @@ struct RegistryDetailPanel: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
             HStack(spacing: 12) {
-                Label("\(skill.installs) installs", systemImage: "arrow.down.circle")
+                Label(strings("\(skill.installs) installs"), systemImage: "arrow.down.circle")
                 if let url = URL(string: "https://skills.sh/\(skill.id)") {
                     Link("skills.sh", destination: url)
+                        .help(strings("Open this skill on skills.sh"))
                 }
                 if let url = URL(string: "https://github.com/\(skill.source)") {
                     Link(skill.source, destination: url)
                         .lineLimit(1)
                         .truncationMode(.middle)
+                        .help(strings("Open source repository"))
                 }
             }
             .font(.caption)
@@ -77,16 +80,18 @@ struct RegistryDetailPanel: View {
                 .background(Color.gray.opacity(0.1))
                 .cornerRadius(4)
                 .textSelection(.enabled)
+                .help(strings("Install command"))
             Button {
                 let pb = NSPasteboard.general
                 pb.clearContents()
                 pb.setString(skill.installCommand, forType: .string)
                 notifications.post(
-                    .init(level: .success, message: String(localized: "Copied install command")))
+                    .init(level: .success, message: strings("Copied install command")))
             } label: {
                 Image(systemName: "doc.on.doc")
             }
             .buttonStyle(.plain)
+            .help(strings("Copy install command"))
         }
         .padding(.horizontal)
         .padding(.bottom, 8)
@@ -97,7 +102,7 @@ struct RegistryDetailPanel: View {
     @ViewBuilder
     private func agentSelector(_ skill: RegistrySkill) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "Install to agents"))
+            Text(strings("Install to agents"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             RegistryAgentChipsFlow(
@@ -113,16 +118,23 @@ struct RegistryDetailPanel: View {
                     Spacer()
                     Text(
                         model.selectedAgentsForInstall.isEmpty
-                            ? String(localized: "Install to Skillport")
-                            : String(localized: "Install")
+                            ? strings("Install to Skillport")
+                            : strings("Install")
                     )
                     Spacer()
                 }
                 .padding(.vertical, 6)
             }
             .buttonStyle(.borderedProminent)
+            .help(installButtonHelp)
         }
         .padding()
+    }
+
+    private var installButtonHelp: String {
+        model.selectedAgentsForInstall.isEmpty
+            ? strings("Install into Skillport")
+            : strings("Install to selected agents")
     }
 
     private func handleInstall(_ skill: RegistrySkill) async {
@@ -132,7 +144,7 @@ struct RegistryDetailPanel: View {
             notifications.post(
                 .init(
                     level: .success,
-                    message: String(localized: "Installed \(installed.name)")))
+                    message: strings("Installed \(installed.name)")))
         case .failure(let error):
             notifications.post(
                 .init(level: .error, message: String(describing: error)))
@@ -145,6 +157,7 @@ struct RegistryAgentChipsFlow: View {
     let agents: [Agent]
     let selected: Set<AgentID>
     let toggle: (AgentID) -> Void
+    @Environment(\.appStrings) private var strings
 
     var body: some View {
         FlowLayout {
@@ -152,30 +165,39 @@ struct RegistryAgentChipsFlow: View {
                 Button {
                     toggle(agent.id)
                 } label: {
-                    Text(agent.id.displayName)
-                        .font(.caption)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(
-                            selected.contains(agent.id)
-                                ? Color.accentColor.opacity(0.3)
-                                : Color.clear
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 4)
-                                .stroke(Color.gray.opacity(0.4), lineWidth: 1)
-                        )
-                        .cornerRadius(4)
+                    HStack(spacing: 5) {
+                        AgentIcon(agentID: agent.id, isInstalled: agent.isInstalled, size: 16)
+                        Text(agent.id.displayName)
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        selected.contains(agent.id)
+                            ? Color.accentColor.opacity(0.3)
+                            : Color.clear
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(Color.gray.opacity(0.4), lineWidth: 1)
+                    )
+                    .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
                 .disabled(!agent.isInstalled)
                 .opacity(agent.isInstalled ? 1 : 0.48)
-                .help(
-                    agent.isInstalled
-                        ? "Install to \(agent.id.displayName)"
-                        : "\(agent.id.displayName) is not detected on this Mac."
-                )
+                .help(helpText(for: agent))
             }
         }
+    }
+
+    private func helpText(for agent: Agent) -> String {
+        if !agent.isInstalled {
+            return strings("\(agent.id.displayName) is not detected on this Mac.")
+        }
+        if selected.contains(agent.id) {
+            return strings("Remove \(agent.id.displayName) from install targets")
+        }
+        return strings("Install to \(agent.id.displayName)")
     }
 }

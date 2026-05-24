@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct AboutTab: View {
+    @Environment(\.appStrings) private var strings
+
     var body: some View {
         VStack(spacing: 12) {
             Spacer()
@@ -14,10 +16,11 @@ struct AboutTab: View {
             .font(.title2).bold()
             Text(versionString).font(.caption).foregroundStyle(.secondary)
             Link(
-                String(localized: "GitHub"),
+                strings("GitHub"),
                 destination: URL(string: "https://github.com/crazygang-ai/skillport")!
             )
             .font(.caption)
+            .help(strings("Open Skillport on GitHub"))
             Spacer()
         }
         .frame(maxWidth: .infinity)

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 
@@ -30,6 +31,35 @@ struct AgentIDTests {
         #expect(AgentID.claudeCode.binaryName == "claude")
         #expect(AgentID.codex.binaryName == "codex")
         #expect(AgentID.copilot.binaryName == "gh")
+    }
+
+    @Test("Visual identities use bundled brand icon assets")
+    func visualIdentities() {
+        var assetNames = Set<String>()
+        for id in AgentID.allCases {
+            let identity = id.visualIdentity
+            #expect(identity.assetName.hasPrefix("agent-"))
+            #expect(!identity.assetName.contains("symbol"))
+            let url = bundledIconURL(named: identity.assetName)
+            #expect(url != nil)
+            if let url {
+                #expect(NSImage(contentsOf: url) != nil)
+            }
+            assetNames.insert(identity.assetName)
+        }
+
+        #expect(assetNames.count == AgentID.allCases.count)
+        #expect(AgentID.claudeCode.visualIdentity.assetName == "agent-claude-code")
+        #expect(AgentID.codex.visualIdentity.assetName == "agent-codex")
+        #expect(AgentID.gemini.visualIdentity.assetName == "agent-gemini-cli")
+    }
+
+    private func bundledIconURL(named assetName: String) -> URL? {
+        Bundle.main.url(
+            forResource: assetName,
+            withExtension: "png",
+            subdirectory: "AgentIcons"
+        ) ?? Bundle.main.url(forResource: assetName, withExtension: "png")
     }
 
     @Test("Codable round-trip")

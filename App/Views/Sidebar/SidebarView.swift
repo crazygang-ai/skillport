@@ -3,14 +3,17 @@ import SwiftUI
 struct SidebarView: View {
     @Environment(AppModel.self) private var app
     @Environment(SkillsModel.self) private var skillsModel
+    @Environment(\.appStrings) private var strings
 
     var body: some View {
         List(selection: selectionBinding) {
-            Section(String(localized: "Views")) {
-                Label(String(localized: "Dashboard"), systemImage: "square.grid.2x2")
+            Section(strings("Views")) {
+                Label(strings("Dashboard"), systemImage: "square.grid.2x2")
                     .tag(SidebarSelection.dashboard)
-                Label(String(localized: "Registry"), systemImage: "books.vertical")
+                    .help(strings("Show installed skills"))
+                Label(strings("Registry"), systemImage: "books.vertical")
                     .tag(SidebarSelection.registry)
+                    .help(strings("Browse the skill registry"))
             }
 
             Section {
@@ -25,11 +28,11 @@ struct SidebarView: View {
                 }
             } header: {
                 HStack(spacing: 6) {
-                    Text(String(localized: "Filter by agent"))
+                    Text(strings("Filter by agent"))
                     if skillsModel.isDetectingAgents || !skillsModel.hasDetectedAgents {
                         ProgressView()
                             .controlSize(.small)
-                            .accessibilityLabel(String(localized: "Detecting agents..."))
+                            .accessibilityLabel(strings("Detecting agents..."))
                     }
                 }
             }
@@ -81,12 +84,11 @@ struct SidebarView: View {
 private struct SidebarAgentRow: View {
     let agent: Agent
     let count: Int
+    @Environment(\.appStrings) private var strings
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "circle.fill")
-                .font(.system(size: 8))
-                .foregroundStyle(agent.isInstalled ? Color.accentColor : Color.secondary.opacity(0.45))
+        HStack(spacing: 10) {
+            AgentIcon(agentID: agent.id, isInstalled: agent.isInstalled, size: 18)
             Text(agent.id.displayName)
                 .foregroundStyle(agent.isInstalled ? Color.primary : Color.secondary)
             Spacer()
@@ -96,5 +98,13 @@ private struct SidebarAgentRow: View {
                 .foregroundStyle(.secondary)
         }
         .opacity(agent.isInstalled ? 1 : 0.55)
+        .help(helpText)
+    }
+
+    private var helpText: String {
+        if agent.isInstalled {
+            return strings("Show skills for \(agent.id.displayName)")
+        }
+        return strings("\(agent.id.displayName) is not detected on this Mac.")
     }
 }

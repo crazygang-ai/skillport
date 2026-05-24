@@ -11,6 +11,7 @@ struct SkillRow: View {
     let onDismissUpdate: (String) -> Void
 
     @Environment(SkillsModel.self) private var skillsModel
+    @Environment(\.appStrings) private var strings
 
     var body: some View {
         let isManagedBySkillport = skillsModel.isManagedSkill(skill)
@@ -37,23 +38,23 @@ struct SkillRow: View {
                     Image(systemName: "doc.on.doc")
                 }
                 .buttonStyle(.borderless)
-                .help(String(localized: "Copy skill path"))
+                .help(strings("Copy skill path"))
                 Button(action: onRevealInFinder) {
                     Image(systemName: "folder")
                 }
                 .buttonStyle(.borderless)
-                .help(String(localized: "Reveal in Finder"))
+                .help(strings("Reveal in Finder"))
                 Button(action: onOpen) {
                     Image(systemName: "pencil")
                 }
                 .buttonStyle(.borderless)
-                .help(String(localized: "Edit SKILL.md"))
+                .help(strings("Edit SKILL.md"))
                 if isManagedBySkillport {
                     Button(role: .destructive, action: onUninstall) {
                         Image(systemName: "trash")
                     }
                     .buttonStyle(.borderless)
-                    .help(String(localized: "Delete Skill"))
+                    .help(strings("Delete Skill"))
                 }
             }
             AgentsRow(
@@ -72,15 +73,16 @@ private struct UpdateActions: View {
     let isManagedBySkillport: Bool
     let onApplyUpdate: () -> Void
     let onDismissUpdate: (String) -> Void
+    @Environment(\.appStrings) private var strings
 
     var body: some View {
         if case .available(let remoteHash) = skill.updateStatus, isManagedBySkillport {
             HStack(spacing: 6) {
                 Button(action: onApplyUpdate) {
-                    Label(String(localized: "Update"), systemImage: "arrow.down.circle")
+                    Label(strings("Update"), systemImage: "arrow.down.circle")
                 }
                 .buttonStyle(.borderless)
-                .help(String(localized: "Update this skill"))
+                .help(strings("Update this skill"))
 
                 Button {
                     onDismissUpdate(remoteHash)
@@ -88,7 +90,7 @@ private struct UpdateActions: View {
                     Image(systemName: "xmark.circle")
                 }
                 .buttonStyle(.borderless)
-                .help(String(localized: "Dismiss this update"))
+                .help(strings("Dismiss this update"))
             }
         }
     }
@@ -119,16 +121,21 @@ private struct AgentChip: View {
     let assignment: AgentAssignmentStatus
     let isManagedBySkillport: Bool
     let onToggle: (Bool) -> Void
+    @Environment(\.appStrings) private var strings
 
     var body: some View {
         Button {
             onToggle(assignment == .notAssigned)
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: systemImage)
-                    .font(.caption2)
+            HStack(spacing: 5) {
+                AgentIcon(agentID: agent.id, isInstalled: agent.isInstalled, size: 16)
                 Text(agent.id.displayName)
                     .font(.caption)
+                if let statusSystemImage {
+                    Image(systemName: statusSystemImage)
+                        .font(.caption2)
+                        .foregroundStyle(statusForeground)
+                }
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
@@ -156,14 +163,14 @@ private struct AgentChip: View {
         }
     }
 
-    private var systemImage: String {
+    private var statusSystemImage: String? {
         switch assignment {
         case .direct:
             return "link"
         case .inherited:
             return "arrow.triangle.branch"
         case .notAssigned:
-            return "circle"
+            return nil
         }
     }
 
@@ -189,45 +196,72 @@ private struct AgentChip: View {
         }
     }
 
+    private var statusForeground: Color {
+        switch assignment {
+        case .direct:
+            return Color.accentColor
+        case .inherited:
+            return Color.secondary
+        case .notAssigned:
+            return Color.clear
+        }
+    }
+
     private var helpText: String {
-        let availability = agent.isInstalled ? "" : " CLI/config not detected on this Mac."
         if !isManagedBySkillport {
-            return
-                "\(agent.id.displayName): external assignment. Import the skill into Skillport before changing links.\(availability)"
+            if agent.isInstalled {
+                return strings(
+                    "\(agent.id.displayName): external assignment. Import the skill into Skillport before changing links."
+                )
+            }
+            return strings(
+                "\(agent.id.displayName): external assignment. Import the skill into Skillport before changing links. CLI/config not detected on this Mac."
+            )
         }
         switch assignment {
         case .direct:
-            return "\(agent.id.displayName): direct link. Click to unlink.\(availability)"
+            if agent.isInstalled {
+                return strings("\(agent.id.displayName): direct link. Click to unlink.")
+            }
+            return strings(
+                "\(agent.id.displayName): direct link. Click to unlink. CLI/config not detected on this Mac."
+            )
         case .inherited:
-            return
-                "\(agent.id.displayName): inherited through fallback. It can use this skill without a direct link.\(availability)"
+            if agent.isInstalled {
+                return strings(
+                    "\(agent.id.displayName): inherited through fallback. It can use this skill without a direct link."
+                )
+            }
+            return strings(
+                "\(agent.id.displayName): inherited through fallback. It can use this skill without a direct link. CLI/config not detected on this Mac."
+            )
         case .notAssigned:
             if agent.isInstalled {
-                return "\(agent.id.displayName): not assigned. Click to create a direct link."
+                return strings("\(agent.id.displayName): not assigned. Click to create a direct link.")
             }
-            return "\(agent.id.displayName): not assigned; CLI/config not detected on this Mac."
+            return strings("\(agent.id.displayName): not assigned; CLI/config not detected on this Mac.")
         }
     }
 
     private var statusText: String {
         switch assignment {
         case .direct:
-            return "Direct link"
+            return strings("Direct link")
         case .inherited:
-            return "Inherited"
+            return strings("Inherited")
         case .notAssigned:
-            return "Not assigned"
+            return strings("Not assigned")
         }
     }
 
     private var accessibilityHint: String {
         switch assignment {
         case .direct:
-            return isManagedBySkillport ? "Unlinks this skill from the agent." : helpText
+            return isManagedBySkillport ? strings("Unlinks this skill from the agent.") : helpText
         case .inherited:
-            return "This agent receives the skill through a fallback directory."
+            return strings("This agent receives the skill through a fallback directory.")
         case .notAssigned:
-            return isActionable ? "Creates a direct link for this agent." : helpText
+            return isActionable ? strings("Creates a direct link for this agent.") : helpText
         }
     }
 }

@@ -19,6 +19,10 @@ struct SkillportApp: App {
     @NSApplicationDelegateAdaptor(AppLifecycleDelegate.self) private var lifecycleDelegate
     @State private var container = AppContainer()
 
+    private var strings: AppStrings {
+        AppStrings(localeIdentifier: container.settingsModel.preferredLocale)
+    }
+
     var body: some Scene {
         WindowGroup("Skillport", id: "main") {
             RootView()
@@ -28,6 +32,8 @@ struct SkillportApp: App {
                 .environment(container.settingsModel)
                 .environment(container.updateModel)
                 .environment(container.registryModel)
+                .environment(\.locale, strings.locale)
+                .environment(\.appStrings, strings)
                 .task {
                     lifecycleDelegate.shutdown = { [container] in
                         await container.shutdown()
@@ -45,7 +51,7 @@ struct SkillportApp: App {
         .windowResizability(.contentSize)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button(String(localized: "Import Skill…")) {
+                Button(strings("Import Skill…")) {
                     guard let url = ImportCommand.pickFolder() else { return }
                     Task {
                         do {
@@ -54,26 +60,26 @@ struct SkillportApp: App {
                             container.notificationModel.post(
                                 .init(
                                     level: .success,
-                                    message: String(
-                                        localized: "Imported \(url.lastPathComponent)")))
+                                    message: strings("Imported \(url.lastPathComponent)")))
                         } catch {
                             container.notificationModel.post(
                                 .init(
                                     level: .error,
-                                    message: String(
-                                        localized:
-                                            "Import failed: \(error.localizedDescription)")))
+                                    message: strings(
+                                        "Import failed: \(error.localizedDescription)")))
                         }
                     }
                 }
                 .keyboardShortcut("n", modifiers: .command)
+                .help(strings("Import a local skill folder"))
             }
             CommandGroup(after: .appSettings) {
-                Button(String(localized: "Rescan")) {
+                Button(strings("Rescan")) {
                     Task { try? await container.skillsModel.refresh(forceAgentSearchPathRefresh: true) }
                 }
                 .keyboardShortcut("r", modifiers: .command)
-                Button(String(localized: "Check for Skill Updates")) {
+                .help(strings("Scan local skills and agents"))
+                Button(strings("Check for Skill Updates")) {
                     Task {
                         do {
                             let results = try await container.skillsModel.checkAllUpdates()
@@ -84,21 +90,21 @@ struct SkillportApp: App {
                             let level: NotificationLevel = available > 0 ? .info : .success
                             let msg =
                                 available > 0
-                                ? String(localized: "\(available) skill updates available")
-                                : String(localized: "All skills are up to date")
+                                ? strings("\(available) skill updates available")
+                                : strings("All skills are up to date")
                             container.notificationModel.post(.init(level: level, message: msg))
                         } catch {
                             container.notificationModel.post(
                                 .init(
                                     level: .error,
-                                    message: String(
-                                        localized:
-                                            "Update check failed: \(error.localizedDescription)")
+                                    message: strings(
+                                        "Update check failed: \(error.localizedDescription)")
                                 ))
                         }
                     }
                 }
                 .keyboardShortcut("u", modifiers: .command)
+                .help(strings("Check all skills for updates"))
             }
         }
 
@@ -107,12 +113,16 @@ struct SkillportApp: App {
                 .environment(container.settingsModel)
                 .environment(container.notificationModel)
                 .environment(container.updateModel)
+                .environment(\.locale, strings.locale)
+                .environment(\.appStrings, strings)
         }
 
         MenuBarExtra("Skillport", systemImage: "cube.box") {
             MenuBarContentView()
                 .environment(container.skillsModel)
                 .environment(container.updateModel)
+                .environment(\.locale, strings.locale)
+                .environment(\.appStrings, strings)
         }
         .menuBarExtraStyle(.window)
     }
