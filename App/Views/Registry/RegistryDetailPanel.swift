@@ -4,6 +4,7 @@ struct RegistryDetailPanel: View {
     @Bindable var model: RegistryModel
     @Environment(SkillsModel.self) private var skills
     @Environment(NotificationModel.self) private var notifications
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.appStrings) private var strings
 
     var body: some View {
@@ -107,34 +108,64 @@ struct RegistryDetailPanel: View {
                 .foregroundStyle(.secondary)
             RegistryAgentChipsFlow(
                 agents: skills.agents,
-                selected: model.selectedAgentsForInstall
+                selected: model.selectedAgentsForInstall,
+                isDisabled: model.isInstalling
             ) { id in
-                model.toggleAgentForInstall(id)
+                withMotion {
+                    model.toggleAgentForInstall(id)
+                }
             }
             Button {
                 Task { await handleInstall(skill) }
             } label: {
-                HStack {
+                HStack(spacing: 8) {
                     Spacer()
-                    Text(
-                        model.selectedAgentsForInstall.isEmpty
-                            ? strings("Install to Skillport")
-                            : strings("Install")
-                    )
+                    if model.isInstallingSelectedSkill {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text(strings("Installing…"))
+                    } else {
+                        Image(systemName: "tray.and.arrow.down")
+                            .imageScale(.small)
+                        Text(
+                            model.selectedAgentsForInstall.isEmpty
+                                ? strings("Install to Skillport")
+                                : strings("Install")
+                        )
+                    }
                     Spacer()
                 }
+                .frame(minHeight: 22)
                 .padding(.vertical, 6)
+                .contentTransition(.opacity)
             }
             .buttonStyle(.borderedProminent)
+            .disabled(model.isInstalling)
             .help(installButtonHelp)
+            .animation(microAnimation, value: model.isInstallingSelectedSkill)
         }
         .padding()
     }
 
     private var installButtonHelp: String {
-        model.selectedAgentsForInstall.isEmpty
+        if model.isInstalling {
+            return strings("Installing…")
+        }
+        return model.selectedAgentsForInstall.isEmpty
             ? strings("Install into Skillport")
             : strings("Install to selected agents")
+    }
+
+    private var microAnimation: Animation? {
+        reduceMotion ? nil : .snappy(duration: 0.18)
+    }
+
+    private func withMotion(_ action: () -> Void) {
+        if reduceMotion {
+            action()
+        } else {
+            withAnimation(.snappy(duration: 0.18), action)
+        }
     }
 
     private func handleInstall(_ skill: RegistrySkill) async {
@@ -156,7 +187,9 @@ struct RegistryDetailPanel: View {
 struct RegistryAgentChipsFlow: View {
     let agents: [Agent]
     let selected: Set<AgentID>
+    var isDisabled = false
     let toggle: (AgentID) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.appStrings) private var strings
 
     var body: some View {
@@ -165,33 +198,52 @@ struct RegistryAgentChipsFlow: View {
                 Button {
                     toggle(agent.id)
                 } label: {
+                    let isSelected = selected.contains(agent.id)
                     HStack(spacing: 5) {
                         AgentIcon(agentID: agent.id, isInstalled: agent.isInstalled, size: 16)
                         Text(agent.id.displayName)
                             .font(.caption)
+                        Image(systemName: "checkmark")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(Color.accentColor)
+                            .frame(width: 10)
+                            .opacity(isSelected ? 1 : 0)
+                            .scaleEffect(isSelected ? 1 : 0.7)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(
-                        selected.contains(agent.id)
+                        isSelected
                             ? Color.accentColor.opacity(0.3)
                             : Color.clear
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 4)
-                            .stroke(Color.gray.opacity(0.4), lineWidth: 1)
+                            .stroke(
+                                isSelected
+                                    ? Color.accentColor.opacity(0.55)
+                                    : Color.gray.opacity(0.4),
+                                lineWidth: 1
+                            )
                     )
                     .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
-                .disabled(!agent.isInstalled)
-                .opacity(agent.isInstalled ? 1 : 0.48)
+                .disabled(isDisabled || !agent.isInstalled)
+                .opacity(agent.isInstalled ? (isDisabled ? 0.7 : 1) : 0.48)
                 .help(helpText(for: agent))
+                .animation(
+                    reduceMotion ? nil : .snappy(duration: 0.16),
+                    value: selected.contains(agent.id)
+                )
             }
         }
     }
 
     private func helpText(for agent: Agent) -> String {
+        if isDisabled {
+            return strings("Installing…")
+        }
         if !agent.isInstalled {
             return strings("\(agent.id.displayName) is not detected on this Mac.")
         }

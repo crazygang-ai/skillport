@@ -28,9 +28,18 @@ public final class RegistryModel {
     public var rendered: RegistryRendered = .empty(reason: AppStrings.current()("Select a skill"))
     public var isLoading: Bool = false
     public var isContentLoading: Bool = false
+    public var installingSkillID: String?
     public var listError: String?
     public var contentError: String?
     public var selectedAgentsForInstall: Set<AgentID> = []
+
+    public var isInstalling: Bool {
+        installingSkillID != nil
+    }
+
+    public var isInstallingSelectedSkill: Bool {
+        installingSkillID == selectedID
+    }
 
     private let registry: RegistryActor
     private let contentFetcher: SkillContentFetcher
@@ -157,6 +166,15 @@ public final class RegistryModel {
             let (owner, repo) = skill.ownerAndRepo
         else {
             return .failure(SkillportError.unexpected("no registry selection to install"))
+        }
+        guard installingSkillID == nil else {
+            return .failure(SkillportError.unexpected("install already in progress"))
+        }
+        installingSkillID = id
+        defer {
+            if installingSkillID == id {
+                installingSkillID = nil
+            }
         }
         do {
             let installed = try await installHandler(

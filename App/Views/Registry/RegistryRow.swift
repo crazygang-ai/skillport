@@ -3,6 +3,7 @@ import SwiftUI
 struct RegistryRow: View {
     let skill: RegistrySkill
     let isSelected: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -25,6 +26,7 @@ struct RegistryRow: View {
         .background(isSelected ? Color.accentColor.opacity(0.15) : .clear)
         .cornerRadius(4)
         .contentShape(Rectangle())
+        .animation(reduceMotion ? nil : .snappy(duration: 0.16), value: isSelected)
     }
 
     private func formatInstalls(_ n: Int) -> String {

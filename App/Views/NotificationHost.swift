@@ -2,6 +2,7 @@ import SwiftUI
 
 struct NotificationHost: View {
     @Environment(NotificationModel.self) private var notifications
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack {
@@ -18,8 +19,15 @@ struct NotificationHost: View {
                 }
             }
             .padding(.bottom, 16)
+            .animation(toastAnimation, value: notifications.toasts)
         }
         .allowsHitTesting(!notifications.toasts.isEmpty)
+    }
+
+    private var toastAnimation: Animation? {
+        reduceMotion
+            ? nil
+            : .spring(response: 0.24, dampingFraction: 0.86, blendDuration: 0.05)
     }
 }
 

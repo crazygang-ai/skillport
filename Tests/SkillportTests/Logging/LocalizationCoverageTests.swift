@@ -77,6 +77,7 @@ struct LocalizationCoverageTests {
             "Install command",
             "Install into Skillport",
             "Install to selected agents",
+            "Installing…",
             "Loading…",
             "Language changed.",
             "Language changes apply immediately.",

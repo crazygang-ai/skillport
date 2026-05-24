@@ -262,4 +262,72 @@ struct RegistryModelTests {
         model.toggleAgentForInstall(.claudeCode)
         #expect(!model.selectedAgentsForInstall.contains(.claudeCode))
     }
+
+    @Test("installSelected exposes loading state while handler is pending")
+    func installSelectedExposesLoadingState() async {
+        let gate = InstallGate()
+        let model = RegistryModel(
+            registry: RegistryActor(session: MockURLProtocol.makeSession()),
+            contentFetcher: SkillContentFetcher(session: MockURLProtocol.makeSession()),
+            installHandler: { owner, repo, ref, skillId, installTo in
+                await gate.markStartedAndWaitForRelease()
+                return Skill(
+                    name: skillId,
+                    path: URL(fileURLWithPath: "/tmp/\(skillId)"),
+                    source: .github(owner: owner, repo: repo, ref: ref),
+                    frontmatter: SKILLMetadata(),
+                    installedAgents: installTo,
+                    updateStatus: .upToDate
+                )
+            }
+        )
+        model.skills = [
+            RegistrySkill(
+                id: "owner/repo/demo", skillId: "demo",
+                name: "Demo", installs: 0, source: "owner/repo"
+            )
+        ]
+        model.selectedID = "owner/repo/demo"
+
+        let install = Task { await model.installSelected() }
+        await gate.waitUntilStarted()
+
+        #expect(model.installingSkillID == "owner/repo/demo")
+        #expect(model.isInstallingSelectedSkill == true)
+
+        await gate.release()
+        let result = await install.value
+        if case .failure(let error) = result {
+            Issue.record("install should succeed, got \(error)")
+        }
+        #expect(model.installingSkillID == nil)
+        #expect(model.isInstallingSelectedSkill == false)
+    }
+}
+
+private actor InstallGate {
+    private var didStart = false
+    private var startWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseWaiter: CheckedContinuation<Void, Never>?
+
+    func markStartedAndWaitForRelease() async {
+        didStart = true
+        startWaiters.forEach { $0.resume() }
+        startWaiters.removeAll()
+        await withCheckedContinuation { continuation in
+            releaseWaiter = continuation
+        }
+    }
+
+    func waitUntilStarted() async {
+        guard !didStart else { return }
+        await withCheckedContinuation { continuation in
+            startWaiters.append(continuation)
+        }
+    }
+
+    func release() {
+        releaseWaiter?.resume()
+        releaseWaiter = nil
+    }
 }

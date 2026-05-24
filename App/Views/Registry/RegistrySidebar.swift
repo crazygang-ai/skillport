@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RegistrySidebar: View {
     @Bindable var model: RegistryModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.appStrings) private var strings
 
     var body: some View {
@@ -23,7 +24,9 @@ struct RegistrySidebar: View {
                 HStack(spacing: 4) {
                     ForEach(LeaderboardCategory.allCases, id: \.self) { c in
                         Button {
-                            model.category = c
+                            withMotion {
+                                model.category = c
+                            }
                         } label: {
                             Text(label(for: c))
                                 .font(.caption)
@@ -46,6 +49,7 @@ struct RegistrySidebar: View {
                 }
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
             // List
@@ -85,7 +89,9 @@ struct RegistrySidebar: View {
                     LazyVStack(alignment: .leading, spacing: 2) {
                         ForEach(model.skills) { skill in
                             Button {
-                                model.beginSelect(id: skill.id)
+                                withMotion {
+                                    _ = model.beginSelect(id: skill.id)
+                                }
                             } label: {
                                 RegistryRow(skill: skill, isSelected: model.selectedID == skill.id)
                             }
@@ -99,6 +105,12 @@ struct RegistrySidebar: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(nsColor: .controlBackgroundColor))
+        .animation(microAnimation, value: model.selectedID)
+        .animation(microAnimation, value: model.category)
+        .animation(
+            microAnimation,
+            value: model.searchInput.trimmingCharacters(in: .whitespaces).isEmpty
+        )
     }
 
     private func retry() async {
@@ -122,6 +134,18 @@ struct RegistrySidebar: View {
         case .allTime: return strings("Show all-time leaderboard")
         case .trending: return strings("Show trending skills")
         case .hot: return strings("Show hot skills")
+        }
+    }
+
+    private var microAnimation: Animation? {
+        reduceMotion ? nil : .snappy(duration: 0.18)
+    }
+
+    private func withMotion(_ action: () -> Void) {
+        if reduceMotion {
+            action()
+        } else {
+            withAnimation(.snappy(duration: 0.18), action)
         }
     }
 }
