@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: macos-15
@@ -42,6 +45,17 @@ jobs:
 
       - name: Check parser parity
         run: ./Scripts/check-parser-parity.sh
+
+      - name: Lint
+        run: swift-format lint --recursive App Domain Tests SkillportPreview
+
+      - name: Test
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -scheme Skillport \
+            -destination 'platform=macOS,arch=arm64' \
+            test
 
       - name: Archive
         env:
@@ -85,7 +99,8 @@ jobs:
 
       - name: Package + sign appcast
         env:
-          APPCAST_DMG_BASE_URL: ${{ secrets.APPCAST_DMG_BASE_URL }}
+          APPCAST_DMG_BASE_URL: https://github.com/crazygang-ai/skillport/releases/download/${{ github.ref_name }}
+          APPCAST_URL: https://github.com/crazygang-ai/skillport/releases/latest/download/appcast.xml
         run: ./Scripts/publish-appcast.sh build/export ${GITHUB_REF_NAME#v}
 
       - name: Clean up Sparkle key

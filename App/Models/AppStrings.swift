@@ -20,7 +20,16 @@ public struct AppStrings: Equatable, Sendable {
     }
 
     public func callAsFunction(_ value: String.LocalizationValue) -> String {
-        String(localized: value, bundle: .main, locale: locale)
+        String(localized: value, bundle: localizedBundle)
+    }
+
+    private var localizedBundle: Bundle {
+        guard let path = Bundle.main.path(forResource: localeIdentifier, ofType: "lproj"),
+            let bundle = Bundle(path: path)
+        else {
+            return .main
+        }
+        return bundle
     }
 }
 

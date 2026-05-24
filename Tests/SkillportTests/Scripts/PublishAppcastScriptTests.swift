@@ -69,3 +69,53 @@ struct ReleaseScriptTests {
             .appendingPathComponent("Scripts/release.sh")
     }
 }
+
+@Suite("release.yml")
+struct ReleaseWorkflowTests {
+    @Test("release workflow can publish release assets")
+    func grantsContentWritePermission() throws {
+        let workflow = try String(contentsOf: workflowURL(), encoding: .utf8)
+
+        #expect(workflow.contains("\npermissions:\n  contents: write\n"))
+    }
+
+    @Test("release workflow runs full preflight before archive")
+    func runsPreflightBeforeArchive() throws {
+        let workflow = try String(contentsOf: workflowURL(), encoding: .utf8)
+
+        let lint = try #require(workflow.range(of: "swift-format lint --recursive"))
+        let test = try #require(
+            workflow.range(of: "xcodebuild \\\n            -scheme Skillport"))
+        let archive = try #require(workflow.range(of: "- name: Archive"))
+
+        #expect(lint.lowerBound < archive.lowerBound)
+        #expect(test.lowerBound < archive.lowerBound)
+    }
+
+    @Test("release workflow derives appcast URLs from the release tag")
+    func derivesAppcastURLsFromTag() throws {
+        let workflow = try String(contentsOf: workflowURL(), encoding: .utf8)
+        let expectedDMGBaseURL =
+            "APPCAST_DMG_BASE_URL: "
+            + "https://github.com/crazygang-ai/skillport/releases/download/"
+            + "${{ github.ref_name }}"
+        let expectedAppcastURL =
+            "APPCAST_URL: "
+            + "https://github.com/crazygang-ai/skillport/releases/latest/download/appcast.xml"
+
+        #expect(!workflow.contains("secrets.APPCAST_DMG_BASE_URL"))
+        #expect(workflow.contains(expectedDMGBaseURL))
+        #expect(workflow.contains(expectedAppcastURL))
+    }
+
+    private func workflowURL() -> URL {
+        let thisFile = URL(fileURLWithPath: #filePath)
+        return
+            thisFile
+            .deletingLastPathComponent()  // Scripts
+            .deletingLastPathComponent()  // SkillportTests
+            .deletingLastPathComponent()  // Tests
+            .deletingLastPathComponent()  // repo root
+            .appendingPathComponent(".github/workflows/release.yml")
+    }
+}

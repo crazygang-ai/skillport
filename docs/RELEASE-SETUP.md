@@ -75,30 +75,28 @@ base64 < sparkle_eddsa_priv.key | pbcopy
 
 选一条路：
 
-### 4a. GitHub Pages（推荐，免费）
+### 4a. GitHub Release assets（默认）
 
-1. 在本仓库 Settings → Pages，选 `main` 分支 + `/docs` 或 `gh-pages` 分支作为 source
-2. `appcast.xml` 的 feed URL：`https://crazygang-ai.github.io/skillport/appcast.xml`
-3. DMG 下载走 GitHub Release（`release.yml` 里 `action-gh-release` 已经配）
-4. `APPCAST_DMG_BASE_URL` 设为 release asset URL：
-   `https://github.com/crazygang-ai/skillport/releases/download/v0.1.0`
-   （每次发布 release.sh 会 tag vX.Y.Z，CI 自动 upload 到该 tag 的 release）
-5. 把 `App/Resources/Info.plist` 的 `SUFeedURL` 改为：
-   `https://crazygang-ai.github.io/skillport/appcast.xml`
-6. 每次 release 后手动把 `build/export-X.Y.Z/appcast.xml` 拷到 Pages 源分支的对应路径并 push，Pages 自动部署
+1. DMG 和 `appcast.xml` 都由 `.github/workflows/release.yml` 上传到 tag 对应的 GitHub Release
+2. `appcast.xml` 的 feed URL 使用 latest release asset：
+   `https://github.com/crazygang-ai/skillport/releases/latest/download/appcast.xml`
+3. DMG 下载 URL 由 CI 根据 tag 自动生成：
+   `https://github.com/crazygang-ai/skillport/releases/download/vX.Y.Z/Skillport-X.Y.Z.dmg`
+4. 把 `App/Resources/Info.plist` 的 `SUFeedURL` 改为：
+   `https://github.com/crazygang-ai/skillport/releases/latest/download/appcast.xml`
 
 ### 4b. 自有域名 / CDN
 
 1. 域名如 `updates.crazygang.ai`，DNS 指到 S3 / Cloudflare Pages / 自家 nginx
 2. `SUFeedURL` = `https://updates.crazygang.ai/appcast.xml`
-3. `APPCAST_DMG_BASE_URL` = `https://updates.crazygang.ai`（DMG 放同域下）
+3. 调整 `.github/workflows/release.yml` 的 `APPCAST_DMG_BASE_URL` / `APPCAST_URL`
 4. 每次 release 后把 appcast.xml + DMG 一起上传到该域名
 
 ---
 
 ## 5. GitHub Secrets（CI 用）
 
-在 repo 的 Settings → Secrets and variables → Actions 加这 8 个：
+在 repo 的 Settings → Secrets and variables → Actions 加这 7 个：
 
 | Secret | 值 | 备注 |
 |---|---|---|
@@ -109,7 +107,6 @@ base64 < sparkle_eddsa_priv.key | pbcopy
 | `AC_TEAM_ID` | Apple Team ID | 同 `DEVELOPMENT_TEAM` |
 | `AC_APP_SPECIFIC_PASSWORD` | App-Specific Password | 步骤 2 的那个 |
 | `SPARKLE_PRIVATE_KEY_BASE64` | EdDSA private key 文件的 base64 | 步骤 3 生成 |
-| `APPCAST_DMG_BASE_URL` | DMG 的 URL prefix | 步骤 4 决定 |
 
 ---
 
@@ -130,9 +127,10 @@ export AC_PROFILE=skillport-notarize
 # 3. Package + sign + appcast
 export SPARKLE_PRIVATE_KEY_PATH=$HOME/.ssh/sparkle_eddsa_priv.key  # 或实际路径
 export APPCAST_DMG_BASE_URL=https://github.com/crazygang-ai/skillport/releases/download/v0.1.0
+export APPCAST_URL=https://github.com/crazygang-ai/skillport/releases/latest/download/appcast.xml
 ./Scripts/publish-appcast.sh build/export-0.1.0 0.1.0
 
-# 4. Push tag → CI release workflow 会重跑一次（跳过已做的 notarize，只负责 GH Release upload）
+# 4. Push tag → CI release workflow 会重跑一次并上传 GH Release assets
 git push && git push --tags
 ```
 
